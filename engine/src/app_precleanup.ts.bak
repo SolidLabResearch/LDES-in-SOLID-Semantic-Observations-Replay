@@ -1,0 +1,376 @@
+// src/app.ts
+
+// This is the Node Typescript logics module to serve the Vue.js front-end of the replay Challenge 82/83.
+// It implements a WebAPI using Express.js.
+// @author Stijn Verstichel (Stijn.Verstichel@UGent.be)
+// UGent - imec - IDLab
+// @date 20221123 
+// @version 1.0.0
+//   This version currently supports:
+//		- Loading datasets in N3 Store using the Streaming Mechanism,
+//		- Getting a summary of measurents being loaded into the N3 Store,
+//		- Checking the loading progress,
+//		- Getting the amount of measurements loaded into the model,
+//		- Sorting the measurements in increasing order of Timestamp,
+//		- Replaying a single measurement to the Solid Pod, and advancing the pointer by one,
+//		- Single user, single threaded approach.
+
+//***********************************************************************************************************
+// IMPORTS																									*
+//***********************************************************************************************************
+
+// Library to expose URL-based endpoints which can be called by the front-end(s). 
+// [https://www.npmjs.com/package/express]
+import express from 'express';
+// CORS is a node.js package for providing a Connect/Express middleware that can be used to enable CORS with various options.
+// [https://www.npmjs.com/package/cors]
+import cors = require('cors');
+// import c from 'cors';
+
+//***********************************************************************************************************
+// REQUIRES																									*
+//***********************************************************************************************************
+
+require('cors');
+
+const { exec } = require("child_process");
+
+const fs = require('fs');
+const app = express();
+const port = 3001;
+
+const N3 = require('n3');
+const store = new N3.Store();
+const { DataFactory } = N3;
+const { namedNode, literal, defaultGraph, quad } = DataFactory;
+import { Quad_Subject } from "n3";
+
+import {
+    getTimeStamp,
+    prefixesFromFilepath,
+    resourceToOptimisedTurtle,
+	Resource,
+	initSession
+} from "./util/EventSource";
+import {
+    extractResources,
+	batchResources
+} from "./util/Processing";
+
+import { Logger } from "@treecg/versionawareldesinldp/dist/logging/Logger";
+const loglevel = "info"
+const logger = new Logger("EventSource", loglevel);
+
+import {
+    SolidCommunication,
+	LDPCommunication,
+	LDESinLDP,
+	LDESMetadata,
+	RDF,
+	LDES,
+	extractLdesMetadata,
+	LDESConfig
+} from "@treecg/versionawareldesinldp"
+import {naiveAlgorithm} from "./algorithms/Naive";
+var datasetFolders: Array<string>;
+datasetFolders = ['C:\\development\\challenge16-replay\\main\\Challenge 16 - Replay - Backend - Typescript\\data'];
+
+var observationSubjects: Array<string>;
+let observationPointer: number = 0;
+var sortedObservationSubjects: Array<Resource>;
+
+var session;
+
+const numbersToAdd = [
+  3,
+  4,
+  10,
+  2
+]
+
+app.use(cors());
+
+let subjectTimedMap = new Map();
+let subjectSortedTimedMap = new Map();
+
+const credentialsFileName = null;
+const lilURL = "http://localhost:3000/test/"
+const treePath = "https://saref.etsi.org/core/hasTimestamp"
+let targetResourceSize = 1024;
+let prefixFile;
+let amount;
+let sourceResources;
+
+
+app.get('/', (req, res) => {
+  res.send('Hello from Express!');
+});
+
+app.listen(port, () => {
+  return console.log(`Express is listening at http://localhost:${port}`);
+});
+
+// Return an array of datafiles available to be used for replay!
+app.get('/datasets/', (req, res) => {
+    let jsonResult = [];
+    console.log(datasetFolders[0]);
+    fs.readdir(datasetFolders[0], (err, files) => {
+        files.forEach(file => {
+            jsonResult.push(file);
+            console.log(jsonResult);
+            console.log(file);
+        });
+        res.send(jsonResult);
+    });
+});
+
+app.get('/loadDataset', (req, res) => {
+    console.log(req.query);
+    let jsonResult = [];
+    jsonResult.push('Hello from Express! The Dataset that will be loaded, if not already done so: ' + req.query.dataset);
+    console.log(jsonResult);
+    res.send(jsonResult);
+	
+	const streamParser = new N3.StreamParser();
+    const rdfStream = fs.createReadStream(datasetFolders[0] + "\\" + req.query.dataset);	
+	
+	rdfStream.pipe(streamParser);
+	streamParser.pipe(SlowConsumer());
+
+	function SlowConsumer() {
+		const writer = require('stream').Writable({ objectMode: true });
+		writer._write = (quad, encoding, done) => {
+		// console.log(quad);
+		store.add(quad);
+		done();
+		// setTimeout(done, 1);
+		// console.log(done);
+	};
+	return writer;
+}	
+});
+
+app.get('/checkLoadingSize', (req, res) => {
+	let jsonResult = [];
+	jsonResult.push(store.countQuads());
+	console.log(jsonResult);
+	res.send(jsonResult);
+});
+
+app.get('/checkObservationCount', (req, res) => {
+	let jsonResult = [];
+	let count = 0;
+	for (const quad of store.match(null, namedNode('https://saref.etsi.org/core/measurementMadeBy'), null)) {
+		//console.log(quad);
+		count++;
+	}
+	jsonResult.push(count);
+	console.log(count);
+	res.send(jsonResult);
+});
+
+app.get('/sortObservations', async (req, res) => {
+
+	// extract every resource based on the subject, where
+    // the subject has the predicate treePath
+	let temp = [];
+	for (const quad of store.match(null, namedNode('https://saref.etsi.org/core/measurementMadeBy'), null)) {
+		temp.push(quad.subject.value);
+		console.log("PUSHING: " + quad.subject.value);
+	}
+
+	// as these values have a timestamp defined using the treePath, sorting can
+    // be applied on this data; this is important for correct grouping later
+
+	console.log(temp);
+	console.log("NUMBER 0");
+	console.log(temp[0]);
+
+	let sortedTemp = mergeSort(temp);
+	
+	sortedObservationSubjects = new Array();
+	console.log(sortedObservationSubjects.length);
+	temp.forEach(function (value) {
+		sortedObservationSubjects.push(namedNode(value));
+	}); 
+
+	let jsonResult = [];
+	jsonResult.push(sortedTemp);
+	res.send(jsonResult);
+});
+
+function mergeSort(list:string []):string [] {
+    if (list.length <= 1) return list;
+    let mid = Math.floor(list.length / 2);
+    let left:string [] = mergeSort(list.slice(0, mid));
+    let right:string [] = mergeSort(list.slice(mid));
+    return merge(left, right);
+}
+
+function merge(list1: string[], list2: string[]):string [] {   
+    let merged:string [] = [],
+        i:number = 0,
+        j:number = 0;
+    while (i < list1.length && j < list2.length) {  
+		// Actual comparison is here
+		
+		
+		let timestamp1 = store.getObjects(namedNode(list1[i]), namedNode('https://saref.etsi.org/core/hasTimestamp'), null)[0].value;
+		console.log(timestamp1);
+		let timestamp2 = store.getObjects(namedNode(list2[j]), namedNode('https://saref.etsi.org/core/hasTimestamp'), null)[0].value;
+		console.log(timestamp2);
+		
+		
+        //if (list1[i] < list2[j]) {
+		if (timestamp1 < timestamp2) {
+            merged.push(list1[i]);
+            i++;
+        } else {
+            merged.push(list2[j]);
+            j++;
+        }
+    }
+    while (i < list1.length) {
+        merged.push(list1[i]);
+        i++;
+    }
+    while (j < list2.length) {
+        merged.push(list2[j]);
+        j++;
+    }
+    return merged;
+}
+
+app.get('/getObservations', (req, res) => {
+	let temp = [];
+	let finalResult = [];
+	for (const quad of store.match(null, namedNode('https://saref.etsi.org/core/measurementMadeBy'), null)) {
+		temp.push(quad.subject.value);
+	}
+	const chunkSize = 10;
+	const chunk = temp.slice(0, chunkSize);
+    // do whatever
+	//console.log(chunk);
+	finalResult = finalResult.concat(chunk);
+	//console.log(finalResult);
+	
+	const chunk2 = temp.slice(temp.length-chunkSize, temp.length);
+	//console.log(chunk2);
+	finalResult.push("...");
+	finalResult = finalResult.concat(chunk2);
+	console.log(temp);
+	observationSubjects = temp;
+	res.send(finalResult);
+	
+	//console.log(chunk);
+	//res.send(chunk);
+});
+	
+app.get('/advanceAndPushObservationPointer', async (req, res) => {
+	console.log("POINTER: " + observationPointer);
+	let jsonResult = [];
+
+	
+	//Integrate EventSource library here!
+    const s = await initSession(credentialsFileName);
+    if (s) {
+        logger.info(`User logged in: ${s.info.webId}`)
+    }	
+	
+	session = s;
+	
+	// Retrieve metadata of lil if it already exists
+    const comm = session ? new SolidCommunication(session) : new LDPCommunication();
+    const lil = new LDESinLDP(lilURL, comm);
+    let metadata: LDESMetadata | undefined	
+	
+	try {
+        const metadataStore = await lil.readMetadata()
+        const ldes = metadataStore.getSubjects(RDF.type, LDES.EventStream, null)
+        if (ldes.length > 1) {
+            logger.info(`Multiple LDESes detected. ${ldes[0].value} was extracted`)
+        }
+        metadata = extractLdesMetadata(metadataStore, ldes[0].value)
+    } catch (e) {
+        console.log("NO LDES PRESENT");
+		// the LDES in LDP does not exist if this fail -> there is no metadata
+    }
+	
+	const eventStreamURI = metadata ? metadata.ldesEventStreamIdentifier : lilURL + '#EventStream';
+	console.log(eventStreamURI);
+		
+	console.log("sortedObservationSubjects.length: "+ sortedObservationSubjects.length);
+	
+    if (sortedObservationSubjects.length === 0) {
+        logger.info(`No valid source data found. Exiting...`);
+        return;
+    }	
+	
+	const prefixes = await prefixesFromFilepath(prefixFile, lilURL);
+	
+    const config: LDESConfig = {
+        LDESinLDPIdentifier: lilURL,
+        treePath: treePath,
+		versionOfPath: "1.0"
+    }
+	
+	let finalResources = [];
+	let tempResources = [];
+	for (const quad of store.match(sortedObservationSubjects[observationPointer], null, null)) {
+		//if (quad.subject.value == sortedObservationSubjects[observationPointer]) {
+			console.log(quad);
+			tempResources.push(quad);
+			//temp.push(quad.subject.value);
+		//}
+	}	
+	finalResources.push(tempResources);	
+	
+	console.log("FINAL RESOURCES");
+	console.log(finalResources);
+	
+    // grouping resources from sortedObservationSubjects together based on size of a single resource and the target resource
+    // size
+    // assume every sourceResource entry is of the same length (on average) to calculate the number of resources
+    // that are to be grouped together
+	console.log("targetResourceSize: "+ targetResourceSize);
+	console.log("targetResourceSize: "+ targetResourceSize);
+    const resourceGroupCount = 1 + Math.floor(targetResourceSize / resourceToOptimisedTurtle(finalResources[0], prefixes).length);
+    const resources = batchResources(finalResources, resourceGroupCount);	
+	
+    let amountResources: number = amount
+    // if input is not a number use the entire collection
+    if (isNaN(amount)) {
+        amountResources = sortedObservationSubjects.length
+    }	
+	
+	console.log("amountResources: "+ amountResources);
+	console.log(sortedObservationSubjects);
+	console.log(sortedObservationSubjects[observationPointer]);
+	
+
+	
+	const bucketSize = 10;
+
+    logger.info(`Resources per UUID: ${resourceGroupCount}`)
+    logger.info("Naive algorithm: Execution for " + amountResources + " resources with a bucket size of " + bucketSize);
+	console.log(lilURL);
+	//console.log(tempResources.slice(0, amountResources));
+	console.log(finalResources);
+	
+	console.log(treePath);
+	console.log(bucketSize);
+	console.log(config);
+	console.log(session);
+	console.log(loglevel);
+    await naiveAlgorithm(lilURL, finalResources, treePath, bucketSize, config, session, loglevel);
+    // Note: currently removed as otherwise no time will be used. Now it might not close when authenticated
+    // process.exit()	
+	
+	observationPointer++;
+	jsonResult.push(observationPointer);
+	res.send(jsonResult);
+});
+
+
+
+

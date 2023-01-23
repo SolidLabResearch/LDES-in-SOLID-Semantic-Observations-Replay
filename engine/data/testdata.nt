@@ -1,0 +1,11 @@
+<https://dahcc.idlab.ugent.be/Protego/_participant1/obs0> <http://rdfs.org/ns/void#inDataset> <https://dahcc.idlab.ugent.be/Protego/_participant1> .
+<https://dahcc.idlab.ugent.be/Protego/_participant1/obs0> <https://saref.etsi.org/core/measurementMadeBy> <https://dahcc.idlab.ugent.be/Homelab/SensorsAndActuators/70:ee:50:67:30:b2> .
+<https://dahcc.idlab.ugent.be/Protego/_participant1/obs0> <https://saref.etsi.org/core/relatesToProperty> <https://dahcc.idlab.ugent.be/Homelab/SensorsAndActuators/org.dyamand.types.common.AtmosphericPressure> .
+<https://dahcc.idlab.ugent.be/Protego/_participant1/obs0> <https://saref.etsi.org/core/hasTimestamp> "2022-01-03T09:04:55.000000"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
+<https://dahcc.idlab.ugent.be/Protego/_participant1/obs0> <https://saref.etsi.org/core/hasValue> "1013.1"^^<http://www.w3.org/2001/XMLSchema#float> .
+
+<https://dahcc.idlab.ugent.be/Protego/_participant1/obs1> <http://rdfs.org/ns/void#inDataset> <https://dahcc.idlab.ugent.be/Protego/_participant1> .
+<https://dahcc.idlab.ugent.be/Protego/_participant1/obs1> <https://saref.etsi.org/core/measurementMadeBy> <https://dahcc.idlab.ugent.be/Homelab/SensorsAndActuators/70:ee:50:63:d9:c0> .
+<https://dahcc.idlab.ugent.be/Protego/_participant1/obs1> <https://saref.etsi.org/core/relatesToProperty> <https://dahcc.idlab.ugent.be/Homelab/SensorsAndActuators/org.dyamand.types.common.AtmosphericPressure> .
+<https://dahcc.idlab.ugent.be/Protego/_participant1/obs1> <https://saref.etsi.org/core/hasTimestamp> "2022-01-03T09:07:03.000000"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
+<https://dahcc.idlab.ugent.be/Protego/_participant1/obs1> <https://saref.etsi.org/core/hasValue> "1013.8"^^<http://www.w3.org/2001/XMLSchema#float> .

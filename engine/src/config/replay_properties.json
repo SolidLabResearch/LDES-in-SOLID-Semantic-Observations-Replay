@@ -1,0 +1,13 @@
+{
+	"port": "3001",
+	"loglevel": "info",
+	"logname": "WEB API",
+	"datasetFolders": "C:\\data\\",
+	"credentialsFileName": null,
+	"lilURL": "http://localhost:3000/test/",
+	"treePath": "https://saref.etsi.org/core/hasTimestamp",
+	"chunkSize": 10,
+	"bucketSize": 10,
+	"targetResourceSize": 1024
+	
+}
