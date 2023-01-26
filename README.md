@@ -13,7 +13,7 @@ The DAHCC dataset will be used as example to replay the data.
 ### engine: 
 
 1. Run a LDES enables CSS, capable of processing LDES metadata e.g.  `docker run --rm -p 3000:3000 -it css:latest -c config/default.json`
-2. Edit the properties file in the `engine/src/config` foler: `replay_properties.json`
+2. Edit the properties file in the `engine/src/config` foler: `replay_properties.json` - sample datasets can be found in here: https://dahcc.idlab.ugent.be/dataset.html
 3. Install the required dependencies: `npm i`
 4. Start the engine with the command in the engine root folder: `npm start`
 
