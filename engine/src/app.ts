@@ -45,7 +45,8 @@ import { Logger } from "@treecg/versionawareldesinldp/dist/logging/Logger";
 import { SolidCommunication, LDPCommunication, LDESinLDP, LDESMetadata, RDF, LDES, extractLdesMetadata, LDESConfig } from "@treecg/versionawareldesinldp"
 // Load the config file with the values of all constants. This import style requires "esModuleInterop"
 import * as propsJson from './config/replay_properties.json';
-
+// Importing the OS module to get the hostname.
+import * as os from 'os';
 
 //***********************************************************************************************************
 // REQUIRES																									*
@@ -136,11 +137,24 @@ app.get('/loadDataset', (req, res) => {
 	logger.info('The Dataset that will be loaded: ' + req.query.dataset)
 
 	const streamParser = new N3.StreamParser();
-	// In need of some optimisation. Full path to be used? Only on Windows, currently ;-)
-    const rdfStream = fs.createReadStream(datasetFolders[0] + "\\" + req.query.dataset);	
+		if (os.platform() == 'win32') {
+		const rdfStream = fs.createReadStream(datasetFolders[0] + "\\" + req.query.dataset);
+		rdfStream.pipe(streamParser);
+
+	} else if (os.platform() == 'linux') {
+		const rdfStream = fs.createReadStream(datasetFolders[0] + "/" + req.query.dataset);
+		rdfStream.pipe(streamParser);
+	}
+	else if (os.platform() == 'darwin') {
+		const rdfStream = fs.createReadStream(datasetFolders[0] + "/" + req.query.dataset);
+		rdfStream.pipe(streamParser);
+	}
+	else {
+		logger.error('The OS is not supported by this application. Please use Linux, Windows or MacOS.');
+
+	}
 	
 	// Stitching the streams together.
-	rdfStream.pipe(streamParser);
 	streamParser.pipe(SlowConsumer());
 	
 	// (Re-)Initialising the N3 Store!

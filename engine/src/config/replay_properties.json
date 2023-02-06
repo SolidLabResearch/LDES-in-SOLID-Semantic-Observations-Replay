@@ -2,7 +2,7 @@
 	"port": "3001",
 	"loglevel": "info",
 	"logname": "WEB API",
-	"datasetFolders": "C:\\data\\",
+	"datasetFolders": "/home/kush/Downloads/DAHCC/",
 	"credentialsFileName": null,
 	"lilURL": "http://localhost:3000/test/",
 	"treePath": "https://saref.etsi.org/core/hasTimestamp",
