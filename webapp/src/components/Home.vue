@@ -47,6 +47,7 @@
 </template>
 
 <script>
+	console.log(import.meta.env.VITE_APP_ENGINE)
     import ChildComponent from "./childComponent.vue";
     import { ref } from "vue"
     let id = 0
@@ -120,7 +121,7 @@
                 .then(data => (this.totalVuePackages = data.total));
 
             const getData = async () => {
-                const res = await fetch("http://localhost:3001/datasets/");
+                const res = await fetch(import.meta.env.VITE_APP_ENGINE+"/datasets/");
                 const data = await res.json();
                 this.datasets = data;
                 console.log(this.datasets);
@@ -133,8 +134,8 @@
             submitRemainingObservations() {
                 console.log("BUTTON REMAINING PRESSED");
                 const pushPointer = async () => {
-                    console.log("Loading http://localhost:3001/advanceAndPushObservationPointerToTheEnd");
-                    const res = await fetch("http://localhost:3001/advanceAndPushObservationPointerToTheEnd");
+                    console.log("Loading "+import.meta.env.VITE_APP_ENGINE+"/advanceAndPushObservationPointerToTheEnd");
+                    const res = await fetch(import.meta.env.VITE_APP_ENGINE+"/advanceAndPushObservationPointerToTheEnd");
                     const data = await res.json();
                     console.log("REMAINING REPLAYES");
                     console.log(data);
@@ -148,8 +149,8 @@
             submitNextObservation() {
                 console.log("BUTTON PRESSED");
                 const pushPointer = async () => {
-                    console.log("Loading http://localhost:3001/advanceAndPushObservationPointer");
-                    const res = await fetch("http://localhost:3001/advanceAndPushObservationPointer");
+                    console.log("Loading "+import.meta.env.VITE_APP_ENGINE+"/advanceAndPushObservationPointer");
+                    const res = await fetch(import.meta.env.VITE_APP_ENGINE+"/advanceAndPushObservationPointer");
                     const data = await res.json();
                     console.log("POINTER POSITION");
                     console.log(data);
@@ -172,8 +173,8 @@
 
             loadDataset() {
                 const getData = async () => {
-                    console.log("Loading http://localhost:3001/loadDataset?dataset=" + this.selectedDataset);
-                    const res = await fetch("http://localhost:3001/loadDataset?dataset=" + this.selectedDataset);
+                    console.log("Loading "+import.meta.env.VITE_APP_ENGINE+"/loadDataset?dataset=" + this.selectedDataset);
+                    const res = await fetch(import.meta.env.VITE_APP_ENGINE+"/loadDataset?dataset=" + this.selectedDataset);
                     const data = await res.json();
                     console.log(data);
                 };
@@ -184,8 +185,8 @@
             checkLoadingSize: function () {
                 console.log(this.doneLoading);
                 const getData = async () => {
-                    console.log("Checking http://localhost:3001/checkLoadingSize");
-                    const res = await fetch("http://localhost:3001/checkLoadingSize");
+                    console.log("Checking "+import.meta.env.VITE_APP_ENGINE+"/checkLoadingSize");
+                    const res = await fetch(import.meta.env.VITE_APP_ENGINE+"/checkLoadingSize");
                     const data = await res.json();
                     console.log(data);
                     if (this.quadCount != 0 && this.quadCount == data[0]) {
@@ -203,8 +204,8 @@
 
             checkObservationCount: function () {
                 const getObservations = async () => {
-                    console.log("Checking http://localhost:3001/checkObservationCount");
-                    const res = await fetch("http://localhost:3001/checkObservationCount");
+                    console.log("Checking "+import.meta.env.VITE_APP_ENGINE+"/checkObservationCount");
+                    const res = await fetch(import.meta.env.VITE_APP_ENGINE+"/checkObservationCount");
                     const data = await res.json();
                     console.log(data);
                     this.observationCount = data[0];
@@ -216,8 +217,8 @@
 
             getObservations: function () {
                 const getObservationSubjects = async () => {
-                    console.log("Checking http://localhost:3001/getObservations");
-                    const res = await fetch("http://localhost:3001/getObservations");
+                    console.log("Checking "+import.meta.env.VITE_APP_ENGINE+"/getObservations");
+                    const res = await fetch(import.meta.env.VITE_APP_ENGINE+"/getObservations");
                     const data = await res.json();
                     console.log(data);
                     this.observationSubjects = data;
@@ -228,8 +229,8 @@
 
             sortObservations: function () {
                 const sortObservationSubjects = async () => {
-                    console.log("Checking http://localhost:3001/sortObservations");
-                    const res = await fetch("http://localhost:3001/sortObservations");
+                    console.log("Checking "+import.meta.env.VITE_APP_ENGINE+"/sortObservations");
+                    const res = await fetch(import.meta.env.VITE_APP_ENGINE+"/sortObservations");
                     const data = await res.json();
                     console.log(data);
                     this.sortedObservationSubjects = data;
