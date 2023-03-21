@@ -17,6 +17,18 @@ The DAHCC dataset will be used as example to replay the data.
 3. Install the required dependencies: `npm i`
 4. Start the engine with the command in the engine root folder: `npm start`
 
+Some more information on the replay_properties.json file:
+1. "port": "3001" ==> The port on which the engine should be running,
+2. "loglevel": "info" ==> Configuration of the amount of logging,
+3. "logname": "WEB API" ==> Name of the logger,
+4. "datasetFolders": "" ==> Server-side path where the data is stored that can be potentially replayed, e.g. `/home/data/`,
+5. "credentialsFileName": null ==> Authentication as per Solid CSS Specification,
+6. "lilURL": "http://localhost:3000/test/" ==> URI of the LDES to be created,
+7. "treePath": "https://saref.etsi.org/core/hasTimestamp" ==> The (ordered) property according wo which the observations are to be streamed into the LDES,
+8. "chunkSize": 10 ==> For visualisation purposes, defines how many of the Observations are to be displayed when requested by the webapp (support parameter),
+9. "bucketSize": 10 ==> How many observations should be contained in a single bucket of the LDES,
+10. "targetResourceSize": 1024 ==> Traget size of the resources on disk, this is a rough estimate and belongs to the Solid Event Sourcing implementation (https://github.com/woutslabbinck/SolidEventSourcing).
+
 The output should look similar to the following:
 
 `> challenge-16---replay---backend---typescript@1.0.0 start`
