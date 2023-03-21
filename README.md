@@ -48,6 +48,15 @@ REMARK: Should you receive following error message
 
 Please delete the following folder: `node_modules\@treecg\versionawareldesinldp\node_modules\@inrupt` This is due to conflicting dependencies and should be resolved onse the versionawareldesinldp package has been refactored.
 
+#### testing / API description:
+1. Get all loadable datasets: DO GET curl http://localhost:3001/datasets ==> YOU GET SOMETHING LIKE ["dataset_participant1_100obs","dataset_participant2_100obs"]
+2. Load a particular dataset: DO GET curl http://localhost:3001/loadDataset?dataset=dataset_participant1_100obs ==> empty result
+3. Checks the loading progress (in quad count): DO GET curl http://localhost:3001/checkLoadingSize ==> YOU GET SOMETHING LIKE [500]
+4. Gets the actual observation count (quads / observation): DO GET curl http://localhost:3001/checkObservationCount ==> YOU GET SOMETHING LIKE [100]
+5. Sort the loaded observations (as according to the configured TreePath): DO GET curl http://localhost:3001?sortObservations YOU GET SOMETHING LIKE [["https://dahcc.idlab.ugent.be/Protego/_participant1/obs0","https://dahcc.idlab.ugent.be/Protego/_participant1/obs1","https://dahcc.idlab.ugent.be/Protego/_participant1/obs2" ... ]]
+6. Gets a sample (as in the configured chunk) set of observations: DOT GET curl http://localhost:3001/getObservations ==> YOY GET SOMETHING LIKE [{"termType":"NamedNode","value":"https://dahcc.idlab.ugent.be/Protego/_participant1/obs0"},{"termType":"NamedNode","value":"https://dahcc.idlab.ugent.be/Protego/_participant1/obs1"} ...}]
+7. Replays one next observation: http://localhost:3001/advanceAndPushObservationPointer ==> YOU GET SOMETHING LIKE [1], which represents the pointer to the next replayable observation. Checking the LDES in the Solid Pod (default: http://localhost:3000/test/), you should see at least two containers (the inbox and the LDES buckets), where the LDES buckets should now contain the replayed observation, e.g. http://localhost:3000/test/1641197095000/aa28a2fa-010f-4b81-8f3c-a57f45e13758.
+
 ### webapp: 
 
 1. Install the required dependencies: `npm i`
