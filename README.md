@@ -102,7 +102,7 @@ A streaming SOLID-based LDES connector that can partition the data in a streamin
 
 The replayer should be able to read a number of files, and stream out the events described in each file. To facility performance and scalability testing, the rates and number of streams should be configurable.
 
-##Screencast
+## Screencast
 Sample screencast
 
 https://user-images.githubusercontent.com/19285142/230097455-26d40ebd-6852-4372-9057-81698d74e93e.mp4
