@@ -28,31 +28,21 @@ The DAHCC dataset will be used as example to replay the data.
    ```shell
    docker run --rm -p 3000:3000 -it solidproject/community-server:latest -c config/default.json
    ```
-2. Edit the properties file `engine/src/config/replay_properties.json`. 
+2. Navigate to the folder `engine` via
+   ```shell
+   cd engine
+   ```
+3. Edit the properties file `src/config/replay_properties.json`. 
    You find information about this file below.
    You find sample datasets at https://dahcc.idlab.ugent.be/dataset.html.
-3. Install the required dependencies via 
+4. Install the required dependencies via 
    ```shell
    npm i
    ```
-4. Start the engine with the command in the engine root folder via 
+5. Start the engine with the command in the engine root folder via 
    ```shell
    npm start
    ```
-
-### Properties file
-Below you find more information properties used in the `replay_properties.json` file:
-
-1. "port": "3001" ==> The port on which the engine should be running,
-2. "loglevel": "info" ==> Configuration of the amount of logging,
-3. "logname": "WEB API" ==> Name of the logger,
-4. "datasetFolders": "" ==> Server-side path where the data is stored that can be potentially replayed, e.g. `/home/data/`,
-5. "credentialsFileName": null ==> Authentication as per Solid CSS Specification,
-6. "lilURL": "http://localhost:3000/test/" ==> URI of the LDES to be created,
-7. "treePath": "https://saref.etsi.org/core/hasTimestamp" ==> The (ordered) property according wo which the observations are to be streamed into the LDES,
-8. "chunkSize": 10 ==> For visualisation purposes, defines how many of the Observations are to be displayed when requested by the webapp (support parameter),
-9. "bucketSize": 10 ==> How many observations should be contained in a single bucket of the LDES,
-10. "targetResourceSize": 1024 ==> Target size of the resources on disk, this is a rough estimate and belongs to the Solid Event Sourcing implementation (https://github.com/woutslabbinck/SolidEventSourcing).
 
 The output should look similar to the following:
 
@@ -77,6 +67,21 @@ REMARK: Should you receive following error message
 Please delete the folder `node_modules\@treecg\versionawareldesinldp\node_modules\@inrupt`. 
 This is due to conflicting dependencies and 
 should be resolved once the `versionawareldesinldp` package has been refactored.
+
+### Properties file
+Below you find more information properties used in the `replay_properties.json` file:
+
+1. "port": "3001" ==> The port on which the engine should be running,
+2. "loglevel": "info" ==> Configuration of the amount of logging,
+3. "logname": "WEB API" ==> Name of the logger,
+4. "datasetFolders": "" ==> Server-side path where the data is stored that can be potentially replayed, e.g. `/home/data/`,
+5. "credentialsFileName": null ==> Authentication as per Solid CSS Specification,
+6. "lilURL": "http://localhost:3000/test/" ==> URI of the LDES to be created,
+7. "treePath": "https://saref.etsi.org/core/hasTimestamp" ==> The (ordered) property according wo which the observations are to be streamed into the LDES,
+8. "chunkSize": 10 ==> For visualisation purposes, defines how many of the Observations are to be displayed when requested by the webapp (support parameter),
+9. "bucketSize": 10 ==> How many observations should be contained in a single bucket of the LDES,
+10. "targetResourceSize": 1024 ==> Target size of the resources on disk, this is a rough estimate and belongs to the Solid Event Sourcing implementation (https://github.com/woutslabbinck/SolidEventSourcing).
+
 
 #### testing / API description:
 1. Get all loadable datasets using a GET request via
