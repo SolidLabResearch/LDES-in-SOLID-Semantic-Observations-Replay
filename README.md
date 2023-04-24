@@ -115,7 +115,7 @@ Below you find more information properties used in the `replay_properties.json` 
    ```
 5. Sort the loaded observations (as according to the configured TreePath) using a GET request via
    ```shell
-   curl http://localhost:3001?sortObservations
+   curl http://localhost:3001/sortObservations
    ```
    You get something like
    ```shell
