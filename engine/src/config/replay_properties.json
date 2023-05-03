@@ -3,12 +3,12 @@
 	"loglevel": "info",
 	"logname": "WEB API",
 	"__comment__" : "enter the location of your dataset folder below this in datasetFolders field. e.g. /home/data/",
-	"datasetFolders": "",
+	"datasetFolders": "C:\\data",
 	"credentialsFileName": null,
 	"lilURL": "http://localhost:3000/test/",
 	"treePath": "https://saref.etsi.org/core/hasTimestamp",
 	"chunkSize": 10,
-	"bucketSize": 10,
-	"targetResourceSize": 1024
-	
+	"bucketSize": 1000,
+	"targetResourceSize": 1024,
+	"batchSize": 10000
 }
