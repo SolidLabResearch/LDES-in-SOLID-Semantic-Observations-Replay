@@ -143,6 +143,11 @@ Below you find more information properties used in the `replay_properties.json` 
    where the LDES buckets should now contain the replayed observation, 
    e.g. http://localhost:3000/test/1641197095000/aa28a2fa-010f-4b81-8f3c-a57f45e13758.
 
+8. Replay all remaining observations using a GET request via
+   ```shell
+   curl http://localhost:3001/advanceAndPushObservationPointerToTheEnd
+   ```
+   
 ### Web app: 
 
 1. Install the required dependencies via 
