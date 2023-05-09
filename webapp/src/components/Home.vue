@@ -28,6 +28,8 @@
     <button v-on:click="sortObservations()">Sort observation subjects</button>
     <button v-on:click="submitNextObservation()">Submit next observation</button>
     <button v-on:click="submitRemainingObservations()">Submit remaining observations</button>
+	<button v-on:click="startReplay()">Start real-time replay</button>
+	<button v-on:click="stopReplay()">Stop real-time replay</button>
 
 
     <h3>Observations ({{ observationCount }}) - Showing max. 20 (first 10 and last 10)</h3>
@@ -43,6 +45,8 @@
     <h2>Replay</h2>
 
     Current pointer position: {{ this.currentPointerPosition }}
+	<br />
+	Running: {{this.running }}
 
 </template>
 
@@ -97,7 +101,7 @@
             return {
                 titleClass: 'title',
                 loadedClass: 'loaded',
-                message: '[SolidLab] This is the replay front-end for the Challange 82/83 demo (13/12) - v1.0.2',
+                message: '[SolidLab] This is the replay front-end for the Challange 82/83 demo (09/05) - v2.0.0',
                 //submessage: 'This is based on the Vue.js tutorial from https://vuejs.org/tutorial/',
                 submessage: '',
                 observations: '',
@@ -111,6 +115,7 @@
                 doneLoading: 0,
                 observationSubjects: null,
                 currentPointerPosition: 0,
+				running: false,
                 sortedObservationSubjects: null
             }
         },
@@ -237,7 +242,33 @@
                 };
 
                 sortObservationSubjects();
+            },
+			
+            startReplay: function () {
+                const startReplayConst = async () => {
+                    console.log("Checking "+import.meta.env.VITE_APP_ENGINE+"/startAutoPlay");
+                    const res = await fetch(import.meta.env.VITE_APP_ENGINE+"/startAutoPlay");
+                    const data = await res.json();
+                    console.log(data);
+                };
+				
+				this.running = true;
+                startReplayConst();
+            },
+
+            stopReplay: function () {
+                const stopReplayConst = async () => {
+                    console.log("Checking "+import.meta.env.VITE_APP_ENGINE+"/stopAutoPlay");
+                    const res = await fetch(import.meta.env.VITE_APP_ENGINE+"/stopAutoPlay");
+                    const data = await res.json();
+                    console.log(data);
+                };
+
+				this.running = false;
+                stopReplayConst();
             }
+
+			
         }
     };
 </script>
