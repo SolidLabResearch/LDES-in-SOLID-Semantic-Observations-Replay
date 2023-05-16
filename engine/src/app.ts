@@ -59,6 +59,7 @@ const fs = require('fs');
 const N3 = require('n3');
 const { DataFactory } = N3;
 const { namedNode, literal, defaultGraph, quad } = DataFactory;
+const { Subject } = require('await-notify');
 
 //***********************************************************************************************************
 // CONSTANTS																								*
@@ -84,6 +85,8 @@ const chunkSize = propsJson.chunkSize;
 const bucketSize = propsJson.bucketSize;
 //Targetted Resource Size per bucket.
 const targetResourceSize = propsJson.targetResourceSize;
+
+const event = new Subject();
 
 
 //***********************************************************************************************************
@@ -308,8 +311,12 @@ app.get('/getObservations', (req, res) => {
 });
 
 async function advanceOneObservation() {
-	logger.info("We're going to replay ONE observation and its related information from the current pointer onwards: " + observationPointer);
-	logger.info("That observation is: " + sortedObservationSubjects[observationPointer]+"");
+	// Move the pointer one step further in the datatset.
+	const observationPointerTemp = observationPointer;
+	observationPointer++;
+
+	logger.info("We're going to replay ONE observation and its related information from the current pointer onwards: " + observationPointerTemp);
+	logger.info("That observation is: " + sortedObservationSubjects[observationPointerTemp]+"");
 
 	//Integrate EventSource library here!
 	//Authentication with the Solid Pod.
@@ -351,7 +358,7 @@ async function advanceOneObservation() {
 	logger.info("Retrieving all related information to the Observation being replayed.");
 	let finalResources = [];
 	let tempResources = [];
-	for (const quad of store.match(sortedObservationSubjects[observationPointer], null, null)) {
+	for (const quad of store.match(sortedObservationSubjects[observationPointerTemp], null, null)) {
 		logger.debug(quad);
 		tempResources.push(quad);
 	}	
@@ -383,7 +390,7 @@ async function advanceOneObservation() {
 	
 	logger.info("The amount of Resources per bucket is: "+ amountResources);
 	logger.debug(sortedObservationSubjects+"");
-	logger.debug(sortedObservationSubjects[observationPointer]+"");
+	logger.debug(sortedObservationSubjects[observationPointerTemp]+"");
 
     logger.info(`Resources per UUID: ${resourceGroupCount}`)
     logger.info("Naive algorithm (SINGLE): Execution for " + amountResources + " resources with a bucket size of " + bucketSize);
@@ -397,8 +404,7 @@ async function advanceOneObservation() {
 	logger.debug(loglevel);
     await naiveAlgorithm(lilURL, finalResources, treePath, bucketSize, config, session, loglevel);
 	
-	// Move the pointer one step further in the datatset.
-	observationPointer++;
+	event.notify();
 }
 
 // Main replay method in the WebAPI, based on the implementation from Wout Slabbinck/Tom Windels ==> STEP-WISE REPLAY	
@@ -552,6 +558,10 @@ function sayHi() {
 	//Here we should call the push by one-method!
 	//http_get("http://localhost:${port}/advanceAndPushObservationPointer");
 	advanceOneObservation();
+
+	console.log('Waiting ....');
+	event.wait();
+	console.log('Event occured');
 	
 	var currentTimestamp;
 	var nextTimestamp;
@@ -570,7 +580,16 @@ function sayHi() {
 	const currentDate = new Date(currentTimestamp);
 	const difference = nextDate.getTime()-currentDate.getTime();
 	logger.info("DIFFERENCE (time-out):" + difference);
+	// Setting a time-out with value 0, results in asynchronous behaviour ...	
+	var newDifference
+	if (difference == 0) {
+		newDifference = difference+100;
+	} else {
+		newDifference = difference;
+	}
+		
+	logger.info("NEW DIFFERENCE (time-out):" + newDifference);
 	if (autoplay) {
-		setTimeout(sayHi, difference);  
+		setTimeout(sayHi, newDifference);  
 	}
 }
