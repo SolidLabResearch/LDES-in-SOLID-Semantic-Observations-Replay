@@ -34,7 +34,7 @@ The DAHCC dataset will be used as example to replay the data.
    ```
 3. Edit the properties file `src/config/replay_properties.json`. 
    You find information about this file below.
-   You find sample datasets at https://dahcc.idlab.ugent.be/dataset.html.
+   You find sample datasets from the DAHCC project at https://dahcc.idlab.ugent.be/dataset.html. In order to build a connected care application, we need to get a good view of the daily activities and lifestyle of the person being monitored at home. Therefore, one of the aims of this project was to collect activity/lifestyle data based on the available sensor data in an ambient house, e.g. sensors for location, movement, light, temperature, the use of certain devices, etc. together with sensors on the monitored people themselves, e.g. wearables or sensors on a smartphone. In addition, sensors are also provided to measure the participants' condition, e.g. blood pressure or weight. The data collection is performed in the IDLab Homelab. In total: 31 "day in life" participants and 12 "night" participants enrolled in this study. More information on all used equipment, mobile applications and Homelab sensors can be found at https://dahcc.idlab.ugent.be/method.html". Typically, one wants to download a Knowledge Graph from a single participant for a given pod. Place the downloaded, and unzipped, file in the folder as specified by the property `datasetFolders` (see further).
 4. Install the required dependencies via 
    ```shell
    npm i
