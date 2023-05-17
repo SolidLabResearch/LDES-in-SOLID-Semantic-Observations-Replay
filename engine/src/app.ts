@@ -65,6 +65,7 @@ const { namedNode, literal, defaultGraph, quad } = DataFactory;
 const app = express();
 //This is the back-end port to be used for the WebAPI.
 const port = propsJson.port;
+const batchSize = propsJson.batchSize;
 const loglevel = propsJson.loglevel;
 const logger = new Logger(propsJson.logname, loglevel);
 //Local Path to where the available datasets can be found.
@@ -443,66 +444,79 @@ app.get('/advanceAndPushObservationPointerToTheEnd', async (req, res) => {
     }	
 		
 	//Retrieving the set of all information/all triples currently related to the Observation being 
-	//identified by the Pointer the Observation itself.
+	//identified by the Pointer to the Observation itself.
 	logger.info("Retrieving all related information to the Observation being replayed.");
-	let finalResources = [];
-	for (let i = observationPointer; i < sortedObservationSubjects.length; i++) {
-		let tempResources = [];
-		for (const quad of store.match(sortedObservationSubjects[i], null, null)) {
-			logger.debug(quad);
-			tempResources.push(quad);
+	
+	let batchnr = 0;
+	logger.info("observation Pointer: " + observationPointer);
+	logger.info("sorted Observation Subjects length:" + sortedObservationSubjects.length);
+	
+	while (observationPointer < sortedObservationSubjects.length) {
+		logger.info("BATCH nr: " + batchnr);
+		batchnr++;
+	
+		let finalResources = [];
+		let amount = 0;
+		for (let i = observationPointer; i < sortedObservationSubjects.length && i-observationPointer < batchSize; i++) {
+			amount++;
+			logger.info("resource: "+i);
+			let tempResources = [];
+			for (const quad of store.match(sortedObservationSubjects[i], null, null)) {
+				logger.debug(quad);
+				tempResources.push(quad);
+			}	
+			finalResources.push(tempResources);	
+		}
+		logger.debug(finalResources+"");
+	
+		//Now we're optimising the size of the buckets in the POD.
+		logger.info("Calculating the optimal size of the buckets in the pod.");
+		const prefixes = await prefixesFromFilepath(prefixFile, lilURL);
+		const config: LDESConfig = {
+			LDESinLDPIdentifier: lilURL,
+			treePath: treePath,
+			versionOfPath: "1.0"
 		}	
-		finalResources.push(tempResources);	
+	
+		// grouping resources from sortedObservationSubjects together based on size of a single resource and the target resource
+		// size
+		// assume every sourceResource entry is of the same length (on average) to calculate the number of resources
+		// that are to be grouped together
+		logger.debug("targetResourceSize: "+ targetResourceSize);
+		const resourceGroupCount = 1 + Math.floor(targetResourceSize / resourceToOptimisedTurtle(finalResources[0], prefixes).length);
+		const resources = batchResources(finalResources, resourceGroupCount);	
+	
+		let amountResources: number = amount
+		// if input is not a number use the entire collection
+		if (isNaN(amount)) {
+			amountResources = sortedObservationSubjects.length
+		}	
+	
+		logger.info("The amount of Resources per bucket is: "+ amountResources);
+		logger.debug(sortedObservationSubjects+"");
+		logger.debug(sortedObservationSubjects[observationPointer]+"");
+
+		logger.info(`Resources per UUID: ${resourceGroupCount}`)
+		logger.info("Naive algorithm (END): Execution for " + amountResources + " resources with a bucket size of " + bucketSize);
+		// Move the pointer to the end further in the datatset.
+		observationPointer=observationPointer+amountResources;
+		logger.info("New POINTER position:" + observationPointer);
+	
+		// Inform the caller about the new pointer value.
+		jsonResult.push(observationPointer);
+
+		logger.debug(lilURL);
+		logger.debug(finalResources+"");	
+		logger.debug(treePath);
+		logger.debug(bucketSize+"");
+		logger.debug(config+"");
+		logger.debug(session);
+		logger.debug(loglevel);
+	
+	
+		await naiveAlgorithm(lilURL, finalResources, treePath, bucketSize, config, session, loglevel);
+	
 	}
-	logger.debug(finalResources+"");
-	
-	//Now we're optimising the size of the buckets in the POD.
-	logger.info("Calculating the optimal size of the buckets in the pod.");
-	const prefixes = await prefixesFromFilepath(prefixFile, lilURL);
-    const config: LDESConfig = {
-        LDESinLDPIdentifier: lilURL,
-        treePath: treePath,
-		versionOfPath: "1.0"
-    }	
-	
-    // grouping resources from sortedObservationSubjects together based on size of a single resource and the target resource
-    // size
-    // assume every sourceResource entry is of the same length (on average) to calculate the number of resources
-    // that are to be grouped together
-	logger.debug("targetResourceSize: "+ targetResourceSize);
-    const resourceGroupCount = 1 + Math.floor(targetResourceSize / resourceToOptimisedTurtle(finalResources[0], prefixes).length);
-    const resources = batchResources(finalResources, resourceGroupCount);	
-	
-    let amountResources: number = amount
-    // if input is not a number use the entire collection
-    if (isNaN(amount)) {
-        amountResources = sortedObservationSubjects.length
-    }	
-	
-	logger.info("The amount of Resources per bucket is: "+ amountResources);
-	logger.debug(sortedObservationSubjects+"");
-	logger.debug(sortedObservationSubjects[observationPointer]+"");
-
-    logger.info(`Resources per UUID: ${resourceGroupCount}`)
-    logger.info("Naive algorithm (END): Execution for " + amountResources + " resources with a bucket size of " + bucketSize);
-	// Move the pointer to the end further in the datatset.
-	observationPointer=observationPointer+amountResources;
-	logger.info("New POINTER position:" + observationPointer);
-	
-	// Inform the caller about the new pointer value.
-	jsonResult.push(observationPointer);
-
-	logger.debug(lilURL);
-	logger.debug(finalResources+"");	
-	logger.debug(treePath);
-	logger.debug(bucketSize+"");
-	logger.debug(config+"");
-	logger.debug(session);
-	logger.debug(loglevel);
-	
-	
-    await naiveAlgorithm(lilURL, finalResources, treePath, bucketSize, config, session, loglevel);
-	
 
 	res.send(jsonResult);
 });
