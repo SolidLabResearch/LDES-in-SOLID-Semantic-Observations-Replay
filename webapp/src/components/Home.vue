@@ -28,6 +28,8 @@
     <button v-on:click="sortObservations()">Sort observation subjects</button>
     <button v-on:click="submitNextObservation()">Submit next observation</button>
     <button v-on:click="submitRemainingObservations()">Submit remaining observations</button>
+	<button v-on:click="startReplay()">Start real-time replay</button>
+	<button v-on:click="stopReplay()">Stop real-time replay</button>
 
 
     <h3>Observations ({{ observationCount }}) - Showing max. 20 (first 10 and last 10)</h3>
@@ -42,7 +44,9 @@
     <br />
     <h2>Replay</h2>
 
-    Current pointer position: {{ this.currentPointerPosition }}
+    Current pointer position: {{ this.currentPointerPosition }} Last update: {{ this.lastupdate }}
+	<br />
+	Running: {{this.running }}
 
 </template>
 
@@ -65,6 +69,7 @@
 
             this.checkLoadingSize();
             this.checkObservationCount();
+			this.checkPointerPosition();
             //this.pollInterval = setInterval(this.checkLoadingSize(), 10000);
             //console.log(this.pollInterval);
         },
@@ -97,7 +102,7 @@
             return {
                 titleClass: 'title',
                 loadedClass: 'loaded',
-                message: '[SolidLab] This is the replay front-end for the Challange 82/83 demo (13/12) - v1.0.2',
+                message: '[SolidLab] This is the replay front-end for the Challange 82/83 demo (17/05) - v2.0.1',
                 //submessage: 'This is based on the Vue.js tutorial from https://vuejs.org/tutorial/',
                 submessage: '',
                 observations: '',
@@ -111,7 +116,9 @@
                 doneLoading: 0,
                 observationSubjects: null,
                 currentPointerPosition: 0,
-                sortedObservationSubjects: null
+				running: false,
+                sortedObservationSubjects: null,
+				lastupdate: ""
             }
         },
         created() {
@@ -214,6 +221,24 @@
 
                 getObservations();
             },
+			
+            checkPointerPosition: function () {
+                const getPointerPosition = async () => {
+                    console.log("Checking "+import.meta.env.VITE_APP_ENGINE+"/checkPointerPosition");
+                    const res = await fetch(import.meta.env.VITE_APP_ENGINE+"/checkPointerPosition");
+                    const data = await res.json();
+                    console.log(data);
+					if (this.currentPointerPosition != data[0]) {
+						const today = new Date();
+						const time = today.getHours() + ":" + today.getMinutes() + ":" + today.getSeconds();
+						this.lastupdate = time;
+					}					
+                    this.currentPointerPosition = data[0];
+                    setTimeout(this.checkPointerPosition, 5000);
+                };
+
+                getPointerPosition();
+            },			
 
             getObservations: function () {
                 const getObservationSubjects = async () => {
@@ -237,7 +262,33 @@
                 };
 
                 sortObservationSubjects();
+            },
+			
+            startReplay: function () {
+                const startReplayConst = async () => {
+                    console.log("Checking "+import.meta.env.VITE_APP_ENGINE+"/startAutoPlay");
+                    const res = await fetch(import.meta.env.VITE_APP_ENGINE+"/startAutoPlay");
+                    const data = await res.json();
+                    console.log(data);
+                };
+				
+				this.running = true;
+                startReplayConst();
+            },
+
+            stopReplay: function () {
+                const stopReplayConst = async () => {
+                    console.log("Checking "+import.meta.env.VITE_APP_ENGINE+"/stopAutoPlay");
+                    const res = await fetch(import.meta.env.VITE_APP_ENGINE+"/stopAutoPlay");
+                    const data = await res.json();
+                    console.log(data);
+                };
+
+				this.running = false;
+                stopReplayConst();
             }
+
+			
         }
     };
 </script>

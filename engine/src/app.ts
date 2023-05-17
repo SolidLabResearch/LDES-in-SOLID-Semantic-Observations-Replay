@@ -4,8 +4,8 @@
 // It implements a WebAPI using Express.js.
 // @author Stijn Verstichel (Stijn.Verstichel@UGent.be)
 // UGent - imec - IDLab
-// @date 20221128 
-// @version 1.0.0
+// @date 20230517 
+// @version 2.0.1
 //   This version currently supports:
 //		- Loading datasets in N3 Store using the Streaming Mechanism,
 //		- Getting a summary of measurents being loaded into the N3 Store,
@@ -13,7 +13,10 @@
 //		- Getting the amount of measurements loaded into the model,
 //		- Sorting the measurements in increasing order of Timestamp,
 //		- Replaying a single measurement to the Solid Pod, and advancing the pointer by one,
+//		- Replaying the remaining items from the dataset, batch-wise to avoid HeapSpace issues
+//		- Auto-replaying of the dataset, taking into account the timestamps between the observations in the dataset.
 //		- Single user, single threaded approach.
+//		- Real-time replaying, including status updates of the pointer position
 
 //***********************************************************************************************************
 // IMPORTS																									*
@@ -57,6 +60,7 @@ const fs = require('fs');
 const N3 = require('n3');
 const { DataFactory } = N3;
 const { namedNode, literal, defaultGraph, quad } = DataFactory;
+const { Subject } = require('await-notify');
 
 //***********************************************************************************************************
 // CONSTANTS																								*
@@ -83,6 +87,8 @@ const bucketSize = propsJson.bucketSize;
 //Targetted Resource Size per bucket.
 const targetResourceSize = propsJson.targetResourceSize;
 
+const event = new Subject();
+
 
 //***********************************************************************************************************
 // VARIABLES																								*
@@ -99,6 +105,8 @@ var sortedObservationSubjects: Array<Resource>;
 var observationPointer: number = 0;
 //Internal variable to keep track of the Authentication session object in case needed.
 var session;
+//This variabele defined whether or not the autoplay function is enabled
+var autoplay = false;
 
 //The following variables are needed for the storage optimisation as implemented by Tom Windels.
 let prefixFile;
@@ -194,6 +202,23 @@ app.get('/checkObservationCount', (req, res) => {
 	}
 	jsonResult.push(count);
 	logger.info("The amount of actual Obervation/Measurement instances in the dataset: " + count + " observations");
+	res.send(jsonResult);
+});
+
+app.get('/checkPointer', (req, res) => {
+	let jsonResult = [];
+	let tempResources = [];
+	for (const quad of store.match(sortedObservationSubjects[observationPointer], null, null)) {
+		logger.debug(quad);
+		tempResources.push(quad);
+	}
+	jsonResult.push(tempResources);
+	res.send(jsonResult);
+});
+
+app.get('/checkPointerPosition', (req, res) => {
+	let jsonResult = [];
+	jsonResult.push(observationPointer);
 	res.send(jsonResult);
 });
 
@@ -303,11 +328,13 @@ app.get('/getObservations', (req, res) => {
 	res.send(finalResult);
 });
 
-// Main replay method in the WebAPI, based on the implementation from Wout Slabbinck/Tom Windels ==> STEP-WISE REPLAY	
-app.get('/advanceAndPushObservationPointer', async (req, res) => {
-	logger.info("We're going to replay ONE observation and its related information from the current pointer onwards: " + observationPointer);
-	logger.info("That observation is: " + sortedObservationSubjects[observationPointer]+"");
-	let jsonResult = [];
+async function advanceOneObservation() {
+	// Move the pointer one step further in the datatset.
+	const observationPointerTemp = observationPointer;
+	observationPointer++;
+
+	logger.info("We're going to replay ONE observation and its related information from the current pointer onwards: " + observationPointerTemp);
+	logger.info("That observation is: " + sortedObservationSubjects[observationPointerTemp]+"");
 
 	//Integrate EventSource library here!
 	//Authentication with the Solid Pod.
@@ -349,7 +376,7 @@ app.get('/advanceAndPushObservationPointer', async (req, res) => {
 	logger.info("Retrieving all related information to the Observation being replayed.");
 	let finalResources = [];
 	let tempResources = [];
-	for (const quad of store.match(sortedObservationSubjects[observationPointer], null, null)) {
+	for (const quad of store.match(sortedObservationSubjects[observationPointerTemp], null, null)) {
 		logger.debug(quad);
 		tempResources.push(quad);
 	}	
@@ -381,7 +408,7 @@ app.get('/advanceAndPushObservationPointer', async (req, res) => {
 	
 	logger.info("The amount of Resources per bucket is: "+ amountResources);
 	logger.debug(sortedObservationSubjects+"");
-	logger.debug(sortedObservationSubjects[observationPointer]+"");
+	logger.debug(sortedObservationSubjects[observationPointerTemp]+"");
 
     logger.info(`Resources per UUID: ${resourceGroupCount}`)
     logger.info("Naive algorithm (SINGLE): Execution for " + amountResources + " resources with a bucket size of " + bucketSize);
@@ -395,8 +422,14 @@ app.get('/advanceAndPushObservationPointer', async (req, res) => {
 	logger.debug(loglevel);
     await naiveAlgorithm(lilURL, finalResources, treePath, bucketSize, config, session, loglevel);
 	
-	// Move the pointer one step further in the datatset.
-	observationPointer++;
+	event.notify();
+}
+
+// Main replay method in the WebAPI, based on the implementation from Wout Slabbinck/Tom Windels ==> STEP-WISE REPLAY	
+app.get('/advanceAndPushObservationPointer', async (req, res) => {
+	let jsonResult = [];
+	
+	await advanceOneObservation();
 	
 	// Inform the caller about the new pointer value.
 	jsonResult.push(observationPointer);
@@ -521,4 +554,60 @@ app.get('/advanceAndPushObservationPointerToTheEnd', async (req, res) => {
 	res.send(jsonResult);
 });
 
+// Allows enabling the real-time auto play functionality
+app.get('/startAutoPlay', async (req, res) => {
+	autoplay = true;
 
+	setTimeout(sayHi, 1);
+
+	let jsonResult = ["Started"];
+	res.send(jsonResult);
+});
+
+// Disables enabling the real-time auto play functionality
+app.get('/stopAutoPlay', async (req, res) => {
+	autoplay = false;
+	let jsonResult = ["Stopped"];
+	res.send(jsonResult);
+});
+
+function sayHi() {
+    logger.info('Hello');
+	//Here we should call the push by one-method!
+	//http_get("http://localhost:${port}/advanceAndPushObservationPointer");
+	advanceOneObservation();
+
+	console.log('Waiting ....');
+	event.wait();
+	console.log('Event occured');
+	
+	var currentTimestamp;
+	var nextTimestamp;
+	
+	for (const quad of store.match(sortedObservationSubjects[observationPointer], namedNode('https://saref.etsi.org/core/hasTimestamp'), null)) {
+		logger.info(quad.object.value);
+		currentTimestamp = quad.object.value;
+	}	
+	
+	for (const quad of store.match(sortedObservationSubjects[observationPointer+1], namedNode('https://saref.etsi.org/core/hasTimestamp'), null)) {
+		logger.info(quad.object.value);
+		nextTimestamp = quad.object.value
+	}	
+	
+	const nextDate = new Date(nextTimestamp);
+	const currentDate = new Date(currentTimestamp);
+	const difference = nextDate.getTime()-currentDate.getTime();
+	logger.info("DIFFERENCE (time-out):" + difference);
+	// Setting a time-out with value 0, results in asynchronous behaviour ...	
+	var newDifference
+	if (difference == 0) {
+		newDifference = difference+100;
+	} else {
+		newDifference = difference;
+	}
+		
+	logger.info("NEW DIFFERENCE (time-out):" + newDifference);
+	if (autoplay) {
+		setTimeout(sayHi, newDifference);  
+	}
+}
