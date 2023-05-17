@@ -4,8 +4,8 @@
 // It implements a WebAPI using Express.js.
 // @author Stijn Verstichel (Stijn.Verstichel@UGent.be)
 // UGent - imec - IDLab
-// @date 20230508 
-// @version 2.0.0
+// @date 20230517 
+// @version 2.0.1
 //   This version currently supports:
 //		- Loading datasets in N3 Store using the Streaming Mechanism,
 //		- Getting a summary of measurents being loaded into the N3 Store,
@@ -16,6 +16,7 @@
 //		- Replaying the remaining items from the dataset, batch-wise to avoid HeapSpace issues
 //		- Auto-replaying of the dataset, taking into account the timestamps between the observations in the dataset.
 //		- Single user, single threaded approach.
+//		- Real-time replaying, including status updates of the pointer position
 
 //***********************************************************************************************************
 // IMPORTS																									*
@@ -201,6 +202,23 @@ app.get('/checkObservationCount', (req, res) => {
 	}
 	jsonResult.push(count);
 	logger.info("The amount of actual Obervation/Measurement instances in the dataset: " + count + " observations");
+	res.send(jsonResult);
+});
+
+app.get('/checkPointer', (req, res) => {
+	let jsonResult = [];
+	let tempResources = [];
+	for (const quad of store.match(sortedObservationSubjects[observationPointer], null, null)) {
+		logger.debug(quad);
+		tempResources.push(quad);
+	}
+	jsonResult.push(tempResources);
+	res.send(jsonResult);
+});
+
+app.get('/checkPointerPosition', (req, res) => {
+	let jsonResult = [];
+	jsonResult.push(observationPointer);
 	res.send(jsonResult);
 });
 
