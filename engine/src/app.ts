@@ -1,11 +1,18 @@
+//2023-05-24T15:09:04.240Z [WEB API] info: We're going to replay ONE observation and its related information from the current pointer onwards: 134
+//2023-05-24T15:09:04.241Z [WEB API] info: That observation is: undefined
+//Waiting ....
+//Event occured
+
+
+
 // src/app.ts
 
 // This is the Node Typescript logics module to serve the Vue.js front-end of the replay Challenge 82/83.
 // It implements a WebAPI using Express.js.
 // @author Stijn Verstichel (Stijn.Verstichel@UGent.be)
 // UGent - imec - IDLab
-// @date 20230517 
-// @version 2.0.1
+// @date 20230525
+// @version 2.0.2
 //   This version currently supports:
 //		- Loading datasets in N3 Store using the Streaming Mechanism,
 //		- Getting a summary of measurents being loaded into the N3 Store,
@@ -107,6 +114,8 @@ var observationPointer: number = 0;
 var session;
 //This variabele defined whether or not the autoplay function is enabled
 var autoplay = false;
+//Time-out until the next observation to be replayed.
+var newDifference;
 
 //The following variables are needed for the storage optimisation as implemented by Tom Windels.
 let prefixFile;
@@ -205,6 +214,8 @@ app.get('/checkObservationCount', (req, res) => {
 	res.send(jsonResult);
 });
 
+// Returns the information that is currently being referenced by the pointer, and thus is next
+// to be replayed.
 app.get('/checkPointer', (req, res) => {
 	let jsonResult = [];
 	let tempResources = [];
@@ -216,9 +227,14 @@ app.get('/checkPointer', (req, res) => {
 	res.send(jsonResult);
 });
 
+// Returns the index of the current pointer, as well as the time-out until the next observation 
+// is to be replayed when automatic replay is enabled.
 app.get('/checkPointerPosition', (req, res) => {
 	let jsonResult = [];
-	jsonResult.push(observationPointer);
+	//jsonResult.push(observationPointer);
+	jsonResult.push({"pointer": observationPointer});
+	jsonResult.push({"timeout": newDifference});
+	console.log(jsonResult);
 	res.send(jsonResult);
 });
 
@@ -328,6 +344,8 @@ app.get('/getObservations', (req, res) => {
 	res.send(finalResult);
 });
 
+// Replays the observation currently being addressed by the pointer, followed by
+// increasing the position of the pointer by one.
 async function advanceOneObservation() {
 	// Move the pointer one step further in the datatset.
 	const observationPointerTemp = observationPointer;
@@ -336,93 +354,97 @@ async function advanceOneObservation() {
 	logger.info("We're going to replay ONE observation and its related information from the current pointer onwards: " + observationPointerTemp);
 	logger.info("That observation is: " + sortedObservationSubjects[observationPointerTemp]+"");
 
-	//Integrate EventSource library here!
-	//Authentication with the Solid Pod.
-    const s = await initSession(credentialsFileName);
-    if (s) {
-        logger.info(`User logged in: ${s.info.webId}`)
-    }	
-	session = s;
+	if(typeof sortedObservationSubjects[observationPointerTemp] === 'undefined') {
+		autoplay = false;
+	} else {
+		//Integrate EventSource library here!
+		//Authentication with the Solid Pod.
+		const s = await initSession(credentialsFileName);
+		if (s) {
+			logger.info(`User logged in: ${s.info.webId}`)
+		}	
+		session = s;
 	
-	// Retrieve metadata of LDSinLDP if it already exists
-	logger.info("Retrieving metadata of LDESinLDP if it already exists.");
-    const comm = session ? new SolidCommunication(session) : new LDPCommunication();
-    const lil = new LDESinLDP(lilURL, comm);
-    let metadata: LDESMetadata | undefined	
+		// Retrieve metadata of LDSinLDP if it already exists
+		logger.info("Retrieving metadata of LDESinLDP if it already exists.");
+		const comm = session ? new SolidCommunication(session) : new LDPCommunication();
+		const lil = new LDESinLDP(lilURL, comm);
+		let metadata: LDESMetadata | undefined	
 	
-	try {
-        const metadataStore = await lil.readMetadata()
-        const ldes = metadataStore.getSubjects(RDF.type, LDES.EventStream, null)
-        if (ldes.length > 1) {
-            logger.info(`Multiple LDESes detected. ${ldes[0].value} was extracted`)
-        }
-        metadata = extractLdesMetadata(metadataStore, ldes[0].value)
-    } catch (e) {
-        logger.info("NO LDES PRESENT");
-		// the LDES in LDP does not exist if this fails -> there is no metadata.
-    }
+		try {
+			const metadataStore = await lil.readMetadata()
+			const ldes = metadataStore.getSubjects(RDF.type, LDES.EventStream, null)	
+			if (ldes.length > 1) {
+				logger.info(`Multiple LDESes detected. ${ldes[0].value} was extracted`)
+			}
+			metadata = extractLdesMetadata(metadataStore, ldes[0].value)
+		} catch (e) {
+			logger.info("NO LDES PRESENT");
+			// the LDES in LDP does not exist if this fails -> there is no metadata.
+		}
 	
-	//Construct the EventStream URI as per agreement, i.e. LIL url concat #EventStream
-	const eventStreamURI = metadata ? metadata.ldesEventStreamIdentifier : lilURL + '#EventStream';
-	logger.debug(eventStreamURI);
-	logger.debug("sortedObservationSubjects.length: "+ sortedObservationSubjects.length);
-    if (sortedObservationSubjects.length === 0) {
-        logger.info(`No valid source data found. Exiting...`);
-        return;
-    }	
+		//Construct the EventStream URI as per agreement, i.e. LIL url concat #EventStream
+		const eventStreamURI = metadata ? metadata.ldesEventStreamIdentifier : lilURL + '#EventStream';
+		logger.debug(eventStreamURI);
+		logger.debug("sortedObservationSubjects.length: "+ sortedObservationSubjects.length);
+		if (sortedObservationSubjects.length === 0) {
+			logger.info(`No valid source data found. Exiting...`);
+			return;
+		}	
 		
-	//Retrieving the set of all information/all triples currently related to the Observation being 
-	//identified by the Pointer the Observation itself.
-	logger.info("Retrieving all related information to the Observation being replayed.");
-	let finalResources = [];
-	let tempResources = [];
-	for (const quad of store.match(sortedObservationSubjects[observationPointerTemp], null, null)) {
-		logger.debug(quad);
-		tempResources.push(quad);
-	}	
-	finalResources.push(tempResources);	
-	logger.debug(finalResources+"");
+		//Retrieving the set of all information/all triples currently related to the Observation being 	
+		//identified by the Pointer the Observation itself.
+		logger.info("Retrieving all related information to the Observation being replayed.");
+		let finalResources = [];
+		let tempResources = [];
+		for (const quad of store.match(sortedObservationSubjects[observationPointerTemp], null, null)) {
+			logger.debug(quad);
+			tempResources.push(quad);
+		}	
+		finalResources.push(tempResources);	
+		logger.debug(finalResources+"");
 	
-	//Now we're optimising the size of the buckets in the POD.
-	logger.info("Calculating the optimal size of the buckets in the pod.");
-	const prefixes = await prefixesFromFilepath(prefixFile, lilURL);
-    const config: LDESConfig = {
-        LDESinLDPIdentifier: lilURL,
-        treePath: treePath,
-		versionOfPath: "1.0"
-    }	
+		//Now we're optimising the size of the buckets in the POD.
+		logger.info("Calculating the optimal size of the buckets in the pod.");
+		const prefixes = await prefixesFromFilepath(prefixFile, lilURL);
+		const config: LDESConfig = {
+			LDESinLDPIdentifier: lilURL,
+			treePath: treePath,
+			versionOfPath: "1.0"
+		}	
 	
-    // grouping resources from sortedObservationSubjects together based on size of a single resource and the target resource
-    // size
-    // assume every sourceResource entry is of the same length (on average) to calculate the number of resources
-    // that are to be grouped together
-	logger.debug("targetResourceSize: "+ targetResourceSize);
-    const resourceGroupCount = 1 + Math.floor(targetResourceSize / resourceToOptimisedTurtle(finalResources[0], prefixes).length);
-    const resources = batchResources(finalResources, resourceGroupCount);	
+		// grouping resources from sortedObservationSubjects together based on size of a single resource and the target resource
+		// size
+		// assume every sourceResource entry is of the same length (on average) to calculate the number of resources
+		// that are to be grouped together
+		logger.debug("targetResourceSize: "+ targetResourceSize);
+		const resourceGroupCount = 1 + Math.floor(targetResourceSize / resourceToOptimisedTurtle(finalResources[0], prefixes).length);
+		const resources = batchResources(finalResources, resourceGroupCount);	
 	
-    let amountResources: number = amount
-    // if input is not a number use the entire collection
-    if (isNaN(amount)) {
-        amountResources = sortedObservationSubjects.length
-    }	
+		let amountResources: number = amount
+		// if input is not a number use the entire collection
+		if (isNaN(amount)) {
+			amountResources = sortedObservationSubjects.length
+		}	
 	
-	logger.info("The amount of Resources per bucket is: "+ amountResources);
-	logger.debug(sortedObservationSubjects+"");
-	logger.debug(sortedObservationSubjects[observationPointerTemp]+"");
+		logger.info("The amount of Resources per bucket is: "+ amountResources);
+		logger.debug(sortedObservationSubjects+"");
+		logger.debug(sortedObservationSubjects[observationPointerTemp]+"");
 
-    logger.info(`Resources per UUID: ${resourceGroupCount}`)
-    logger.info("Naive algorithm (SINGLE): Execution for " + amountResources + " resources with a bucket size of " + bucketSize);
+		logger.info(`Resources per UUID: ${resourceGroupCount}`)
+		logger.info("Naive algorithm (SINGLE): Execution for " + amountResources + " resources with a bucket size of " + bucketSize);
 
-	logger.debug(lilURL);
-	logger.debug(finalResources+"");	
-	logger.debug(treePath);
-	logger.debug(bucketSize+"");
-	logger.debug(config+"");
-	logger.debug(session);
-	logger.debug(loglevel);
-    await naiveAlgorithm(lilURL, finalResources, treePath, bucketSize, config, session, loglevel);
+		logger.debug(lilURL);
+		logger.debug(finalResources+"");	
+		logger.debug(treePath);
+		logger.debug(bucketSize+"");
+		logger.debug(config+"");
+		logger.debug(session);
+		logger.debug(loglevel);
+		await naiveAlgorithm(lilURL, finalResources, treePath, bucketSize, config, session, loglevel);
 	
-	event.notify();
+		event.notify();
+	}
 }
 
 // Main replay method in the WebAPI, based on the implementation from Wout Slabbinck/Tom Windels ==> STEP-WISE REPLAY	
@@ -571,10 +593,10 @@ app.get('/stopAutoPlay', async (req, res) => {
 	res.send(jsonResult);
 });
 
+// Implementation of the time-out logic to facilitate real-time replaying.
 function sayHi() {
     logger.info('Hello');
 	//Here we should call the push by one-method!
-	//http_get("http://localhost:${port}/advanceAndPushObservationPointer");
 	advanceOneObservation();
 
 	console.log('Waiting ....');
@@ -599,9 +621,9 @@ function sayHi() {
 	const difference = nextDate.getTime()-currentDate.getTime();
 	logger.info("DIFFERENCE (time-out):" + difference);
 	// Setting a time-out with value 0, results in asynchronous behaviour ...	
-	var newDifference
+	
 	if (difference == 0) {
-		newDifference = difference+100;
+		newDifference = difference+1;
 	} else {
 		newDifference = difference;
 	}

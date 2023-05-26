@@ -44,7 +44,7 @@
     <br />
     <h2>Replay</h2>
 
-    Current pointer position: {{ this.currentPointerPosition }} Last update: {{ this.lastupdate }}
+    Current pointer position: {{ this.currentPointerPosition }} Timeout until next replay: {{ this.currentTimeout }} ms. Last update: {{ this.lastupdate }}
 	<br />
 	Running: {{this.running }}
 
@@ -102,7 +102,7 @@
             return {
                 titleClass: 'title',
                 loadedClass: 'loaded',
-                message: '[SolidLab] This is the replay front-end for the Challange 82/83 demo (17/05) - v2.0.1',
+                message: '[SolidLab] This is the replay front-end for the Challange 82/83 demo (24/05) - v2.0.2',
                 //submessage: 'This is based on the Vue.js tutorial from https://vuejs.org/tutorial/',
                 submessage: '',
                 observations: '',
@@ -116,6 +116,7 @@
                 doneLoading: 0,
                 observationSubjects: null,
                 currentPointerPosition: 0,
+				currentTimeout: 0,
 				running: false,
                 sortedObservationSubjects: null,
 				lastupdate: ""
@@ -233,7 +234,9 @@
 						const time = today.getHours() + ":" + today.getMinutes() + ":" + today.getSeconds();
 						this.lastupdate = time;
 					}					
-                    this.currentPointerPosition = data[0];
+                    this.currentPointerPosition = data[0]["pointer"];
+					this.currentTimeout = data[1]["timeout"];
+					
                     setTimeout(this.checkPointerPosition, 5000);
                 };
 
