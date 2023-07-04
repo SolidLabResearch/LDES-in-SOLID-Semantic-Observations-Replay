@@ -55,18 +55,6 @@ The output should look similar to the following:
 
 2022-12-08T14:58:54.612Z [WEB API] info: Express is listening at http://localhost:3001
 ```
-REMARK: Should you receive following error message
-
-```shell
-`src/algorithms/Naive.ts:66:51 - error TS2345: Argument of type 'import("C:/temp/CLEAN3/ldes-in-solid-semantic-observations-replay/engine/node_modules/@inrupt/solid-client-authn-node/dist/Session").Session' is not assignable to parameter of type 'import("C:/temp/CLEAN3/ldes-in-solid-semantic-observations-replay/engine/node_modules/@treecg/versionawareldesinldp/node_modules/@inrupt/solid-client-authn-node/dist/Session").Session'.
- Types have separate declarations of a private property 'clientAuthentication'.
-
-66     const comm = session ? new SolidCommunication(session) : new LDPCommunication();
-```
-
-Please delete the folder `node_modules\@treecg\versionawareldesinldp\node_modules\@inrupt`. 
-This is due to conflicting dependencies and 
-should be resolved once the `versionawareldesinldp` package has been refactored.
 
 ### Properties file
 Below you find more information properties used in the `replay_properties.json` file:
