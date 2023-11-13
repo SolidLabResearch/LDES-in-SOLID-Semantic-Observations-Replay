@@ -6,20 +6,21 @@
  *****************************************/
 
 import {
-    Communication,
     DCT,
     ILDESinLDPMetadata,
     LDP,
     MetadataParser,
+    SolidCommunication,
     storeToString,
     turtleStringToStore
 } from "@treecg/versionawareldesinldp";
-import {addResourcesToBuckets, calculateBucket, createBucketUrl, getTimeStamp, Resource} from "../util/EventSource";
-import {editMetadata} from "../util/Util";
-import {Store} from "n3";
-import {addRelationToNode, createContainer} from "@treecg/versionawareldesinldp/dist/ldes/Util";
-import {Logger} from "@treecg/versionawareldesinldp/dist/logging/Logger";
-import {performance, PerformanceObserver} from "perf_hooks";
+import { addResourcesToBuckets, calculateBucket, createBucketUrl, getTimeStamp, Resource } from "../util/EventSource";
+import { editMetadata } from "../util/Util";
+import { Store } from "n3";
+import { addRelationToNode, createContainer } from "@treecg/versionawareldesinldp/dist/ldes/Util";
+import { Logger } from "@treecg/versionawareldesinldp/dist/logging/Logger";
+import { performance, PerformanceObserver } from "perf_hooks";
+import { RateLimitedLDPCommunication } from "rate-limited-ldp-communication";
 
 /**
  * In order to correctly rebalance the container,
@@ -31,15 +32,15 @@ import {performance, PerformanceObserver} from "perf_hooks";
  * @param loglevel
  * @returns {Promise<void>}
  */
-export async function rebalanceContainer(ldpCommunication: Communication, metadata: ILDESinLDPMetadata, containerURL: string,
-                                         bucketSize: number, prefixes: any, loglevel: string = 'info'): Promise<void> {
+export async function rebalanceContainer(ldpCommunication: SolidCommunication | RateLimitedLDPCommunication, metadata: ILDESinLDPMetadata, containerURL: string,
+    bucketSize: number, prefixes: any, loglevel: string = 'info'): Promise<void> {
 
     const logger = new Logger(rebalanceContainer.name, loglevel)
     // https://dev.to/typescripttv/measure-execution-times-in-browsers-node-js-js-ts-1kik
     // extra filter step to be unique
     const observer = new PerformanceObserver(list => list.getEntries().filter(entry => entry.detail === containerURL)
         .forEach(entry => logger.info(entry.name + " took " + Math.round(entry.duration) + " ms to complete")));
-    observer.observe({buffered: false, entryTypes: ['measure']});
+    observer.observe({ buffered: false, entryTypes: ['measure'] });
 
     const markStart = rebalanceContainer.name + "start"
     const preparation = rebalanceContainer.name + "prep"
@@ -165,7 +166,7 @@ export async function rebalanceContainer(ldpCommunication: Communication, metada
         end: preparation,
         detail: containerURL
     });
-    performance.measure("step a: calculate buckets", {start: preparation, end: step1, detail: containerURL});
+    performance.measure("step a: calculate buckets", { start: preparation, end: step1, detail: containerURL });
     performance.measure("step b: create containers for the buckets", {
         start: step1,
         end: step2,

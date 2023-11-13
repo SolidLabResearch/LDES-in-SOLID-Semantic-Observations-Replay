@@ -25,6 +25,7 @@
     "await-notify": "^1.0.1",
     "cors": "^2.8.5",
     "express": "^4.18.2",
-    "n3": "^1.16.2"
+    "n3": "^1.16.2",
+    "rate-limited-ldp-communication": "^1.0.0"
   }
 }

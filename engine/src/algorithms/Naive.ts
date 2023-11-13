@@ -24,7 +24,8 @@ import {rebalanceContainer} from "./NaiveRebalancing";
 import {Logger} from "@treecg/versionawareldesinldp/dist/logging/Logger";
 import {performance, PerformanceObserver} from 'perf_hooks'
 import {editMetadata} from "../util/Util";
-
+import * as propsJson from '../config/replay_properties.json';
+import { RateLimitedLDPCommunication } from "rate-limited-ldp-communication";
 const {quad, namedNode} = DataFactory
 
 
@@ -64,7 +65,7 @@ export async function naiveAlgorithm(lilURL: string, resources: Resource[], vers
     performance.mark(markStart);
 
     // step 1: init ldes if not initialised yet
-    const comm = session ? new SolidCommunication(session) : new LDPCommunication();
+    const comm = session ? new SolidCommunication(session) : new RateLimitedLDPCommunication(propsJson.rateLimit);
     const lil = new LDESinLDP(lilURL, comm);
     await lil.initialise(config);
 

@@ -7,6 +7,7 @@
 	"credentialsFileName": null,
 	"lilURL": "http://localhost:3000/test/",
 	"treePath": "https://saref.etsi.org/core/hasTimestamp",
+	"rateLimit": "insert the rateLimit of the HTTP requests to make here, e.g 20",
 	"chunkSize": 10,
 	"bucketSize": 1000,
 	"targetResourceSize": 1024,
