@@ -66,9 +66,11 @@ Below you find more information properties used in the `replay_properties.json` 
 5. "credentialsFileName": null ==> Authentication as per Solid CSS Specification,
 6. "lilURL": "http://localhost:3000/test/" ==> URI of the LDES to be created,
 7. "treePath": "https://saref.etsi.org/core/hasTimestamp" ==> The (ordered) property according wo which the observations are to be streamed into the LDES,
-8. "chunkSize": 10 ==> For visualisation purposes, defines how many of the Observations are to be displayed when requested by the webapp (support parameter),
-9. "bucketSize": 10 ==> How many observations should be contained in a single bucket of the LDES,
-10. "targetResourceSize": 1024 ==> Target size of the resources on disk, this is a rough estimate and belongs to the Solid Event Sourcing implementation (https://github.com/woutslabbinck/SolidEventSourcing).
+8. "rateLimit": The HTTP rate limit in number of requests per second,
+9. "membersPerResource": The number of members you wish to have in a single resource,
+10. "chunkSize": 10 ==> For visualisation purposes, defines how many of the Observations are to be displayed when requested by the webapp (support parameter),
+11. "bucketSize": 10 ==> How many observations should be contained in a single bucket of the LDES,
+12. "targetResourceSize": 1024 ==> Target size of the resources on disk, this is a rough estimate and belongs to the Solid Event Sourcing implementation (https://github.com/woutslabbinck/SolidEventSourcing).
 
 
 #### testing / API description:

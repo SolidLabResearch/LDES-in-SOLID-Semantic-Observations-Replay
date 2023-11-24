@@ -538,8 +538,11 @@ app.get('/advanceAndPushObservationPointerToTheEnd', async (req, res) => {
 		// assume every sourceResource entry is of the same length (on average) to calculate the number of resources
 		// that are to be grouped together
 		logger.debug("targetResourceSize: " + targetResourceSize);
-		const resourceGroupCount = 1 + Math.floor(targetResourceSize / resourceToOptimisedTurtle(finalResources[0], prefixes).length);
+		const resourceGroupCount = propsJson.membersPerResource;
+		// const resourceGroupCount = 1 + Math.floor(targetResourceSize / resourceToOptimisedTurtle(finalResources[0], prefixes).length);
 		const resources = batchResources(finalResources, resourceGroupCount);
+		console.log(resources);
+		
 
 		let amountResources: number = amount
 		// if input is not a number use the entire collection
@@ -568,9 +571,7 @@ app.get('/advanceAndPushObservationPointerToTheEnd', async (req, res) => {
 		logger.debug(session);
 		logger.debug(loglevel);
 
-
-		await naiveAlgorithm(lilURL, finalResources, treePath, bucketSize, config, prefixes, session, loglevel);
-
+		await naiveAlgorithm(lilURL, resources, treePath, bucketSize, config, prefixes, session, loglevel);
 	}
 
 	res.send(jsonResult);
