@@ -1,13 +1,14 @@
 import {
+    appendRelationToPage,
     DCT,
     extractTimestampFromLiteral,
     ILDESinLDPMetadata,
     LDPCommunication,
     turtleStringToStore
 } from "@treecg/versionawareldesinldp";
-import {DataFactory, Literal, Quad, Quad_Object, Store, Writer} from "n3";
-import {existsSync, readFileSync} from "fs";
-import {Session} from "@rubensworks/solid-client-authn-isomorphic";
+import { DataFactory, Literal, Quad, Quad_Object, Store, Writer } from "n3";
+import { existsSync, readFileSync } from "fs";
+import { Session } from "@rubensworks/solid-client-authn-isomorphic";
 
 const namedNode = DataFactory.namedNode;
 
@@ -119,33 +120,33 @@ export function resourceToOptimisedTurtle(resource: Resource, _prefixes: any): s
     const named = new Map<string, Map<string, Quad_Object[]>>();
     const blank = new Map<string, Map<string, Quad_Object[]>>();
     addElements:
-        for (const quad of resource) {
-            const data = quad.subject.termType == "BlankNode" ? blank : named;
-            if (data.has(quad.subject.id)) {
-                const props = data.get(quad.subject.id)!;
-                if (props.has(quad.predicate.id)) {
-                    // check if value is already in array, if it is, dont add it anymore
-                    const objs = props.get(quad.predicate.id)!;
-                    for (const obj of objs) {
-                        // while it might offer better performance to use a set instead
-                        // of an array, the custom type Quad_Object would not work correctly
-                        // with Set.has(), and thus would require a seperate container storing
-                        // the IDs (which would in turn not be memory efficient)
-                        if (obj.equals(quad.object)) {
-                            continue addElements;
-                        }
+    for (const quad of resource) {
+        const data = quad.subject.termType == "BlankNode" ? blank : named;
+        if (data.has(quad.subject.id)) {
+            const props = data.get(quad.subject.id)!;
+            if (props.has(quad.predicate.id)) {
+                // check if value is already in array, if it is, dont add it anymore
+                const objs = props.get(quad.predicate.id)!;
+                for (const obj of objs) {
+                    // while it might offer better performance to use a set instead
+                    // of an array, the custom type Quad_Object would not work correctly
+                    // with Set.has(), and thus would require a seperate container storing
+                    // the IDs (which would in turn not be memory efficient)
+                    if (obj.equals(quad.object)) {
+                        continue addElements;
                     }
-                    objs.push(quad.object);
-                } else {
-                    props.set(quad.predicate.id, new Array(quad.object));
                 }
+                objs.push(quad.object);
             } else {
-                data.set(quad.subject.id, new Map([[quad.predicate.id, new Array(quad.object)]]));
+                props.set(quad.predicate.id, new Array(quad.object));
             }
+        } else {
+            data.set(quad.subject.id, new Map([[quad.predicate.id, new Array(quad.object)]]));
         }
+    }
     // converting all the entries of the blank map first
     // with the ordered view done, a more compact turtle string can be generated
-    const writer = new Writer({prefixes: _prefixes});
+    const writer = new Writer({ prefixes: _prefixes });
     for (const [subject, properties] of named) {
         for (const [predicate, objects] of properties) {
             for (const object of objects) {
@@ -183,7 +184,21 @@ export function resourceToOptimisedTurtle(resource: Resource, _prefixes: any): s
 export async function addResourcesToBuckets(bucketResources: BucketResources, metadata: ILDESinLDPMetadata, ldpComm: LDPCommunication, prefixes: any) {
     for (const containerURL of Object.keys(bucketResources)) {
         for (const resource of bucketResources[containerURL]) {
-            const response = await ldpComm.post(containerURL, resourceToOptimisedTurtle(resource, prefixes))
+            const response = await ldpComm.post(containerURL, resourceToOptimisedTurtle(resource, prefixes));
+            // check how you would handle the resource timestamp. and extract. and add to metadata
+            let date_relation = new Date()
+            for (let quad of resource) {
+                if (quad.predicate.value === metadata.view.relations[0].path) {
+                    date_relation = new Date(quad.object.value)
+                }
+            }
+            await appendRelationToPage({
+                communication: ldpComm,
+                containerURL: containerURL,
+                metadata: metadata,
+                date: date_relation,
+                resourceURL: response.headers.get('location')!,
+            })
             // console.log(`Resource stored at: ${response.headers.get('location')} | status: ${response.status}`)
             // TODO: handle when status is not 201 (Http Created)
         }

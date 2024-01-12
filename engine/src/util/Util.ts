@@ -1,8 +1,8 @@
 // TODO: util has to be moved to LdesUtil of the package VersionAwareLIL
-import {Communication, LDES, LDESMetadata, LDP, RDF, storeToString, TREE, XSD} from "@treecg/versionawareldesinldp";
-import {DataFactory, Store} from "n3";
-import {Logger} from "@treecg/versionawareldesinldp/dist/logging/Logger";
-const {quad, namedNode, literal} = DataFactory
+import { Communication, ILDESinLDPMetadata, LDES, LDESMetadata, LDP, patchSparqlUpdateDelete, RDF, storeToString, TREE, XSD } from "@treecg/versionawareldesinldp";
+import { DataFactory, Store } from "n3";
+import { Logger } from "@treecg/versionawareldesinldp/dist/logging/Logger";
+const { quad, namedNode, literal } = DataFactory
 
 /**
  * Convert the ldes metadata object back to an N3 Store
@@ -46,4 +46,19 @@ export async function editMetadata(resourceIdentifier: string, communication: Co
         logger.error(await response.text())
         throw new Error("Something went wrong when trying to patch the root")
     }
+}
+
+export async function removeRelationFromPage(args: {
+    communication: Communication,
+    containerURL: string,
+    metadata: ILDESinLDPMetadata,
+    resourceURL: string,
+}): Promise<void> {
+    const {communication, containerURL, metadata, resourceURL} = args;
+    let store = new Store();
+    store.add(quad(namedNode(containerURL), namedNode(TREE.relation), namedNode(resourceURL)));
+    console.log(store.getQuads(null, null, null, null));
+    await communication.patch(containerURL + '.meta', patchSparqlUpdateDelete(store)).then(() => {
+        console.log("Relation removed from page");
+    });
 }

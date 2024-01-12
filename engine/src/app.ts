@@ -541,7 +541,6 @@ app.get('/advanceAndPushObservationPointerToTheEnd', async (req, res) => {
 		const resourceGroupCount = propsJson.membersPerResource;
 		// const resourceGroupCount = 1 + Math.floor(targetResourceSize / resourceToOptimisedTurtle(finalResources[0], prefixes).length);
 		const resources = batchResources(finalResources, resourceGroupCount);
-		console.log(resources);
 		
 
 		let amountResources: number = amount

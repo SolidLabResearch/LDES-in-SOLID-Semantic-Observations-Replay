@@ -15,7 +15,7 @@ import {
     turtleStringToStore
 } from "@treecg/versionawareldesinldp";
 import { addResourcesToBuckets, calculateBucket, createBucketUrl, getTimeStamp, Resource } from "../util/EventSource";
-import { editMetadata } from "../util/Util";
+import { editMetadata, removeRelationFromPage } from "../util/Util";
 import { Store } from "n3";
 import { addRelationToNode, createContainer } from "@treecg/versionawareldesinldp/dist/ldes/Util";
 import { Logger } from "@treecg/versionawareldesinldp/dist/logging/Logger";
@@ -67,7 +67,7 @@ export async function rebalanceContainer(ldpCommunication: SolidCommunication | 
     const resources: Resource[] = []
     const resourcesLocationMap: Map<Resource, string> = new Map()
     for (const resourceSubject of containerStore.getObjects(containerURL, LDP.contains, null)) {
-        const resourceURL = resourceSubject.value
+        const resourceURL = resourceSubject.value;
         const response = await ldpCommunication.get(resourceURL) // also possible to fail
         const resourceStore = await turtleStringToStore(await response.text(), resourceURL)
         const resource = resourceStore.getQuads(null, null, null, null)
@@ -143,6 +143,13 @@ export async function rebalanceContainer(ldpCommunication: SolidCommunication | 
             const resourceUrl = resourcesLocationMap.get(resource)
             if (resourceUrl) {
                 const response = await ldpCommunication.delete(resourceUrl)
+                // remove from metadata
+                removeRelationFromPage({
+                    communication: ldpCommunication,
+                    containerURL: containerURL,
+                    metadata: metadata,
+                    resourceURL: resourceUrl
+                })
             } else {
                 logger.error('for some reason, following resource could not be deleted: ' + resourceUrl)
             }

@@ -8,11 +8,11 @@
 	"lilURL": "http://localhost:3000/dataset_participant1/xyz/",
 	"treePath": "https://saref.etsi.org/core/hasTimestamp",
 	"___comment___": "insert the number of HTTP requests to make here, e.g 20",
-	"rateLimit": 20,
+	"rateLimit": 100,
 	"_comment_": "insert the number of members per resource here, e.g. 10",
 	"membersPerResource": 10,
-	"chunkSize": 10,
+	"chunkSize": 1000,
 	"bucketSize": 1000,
 	"targetResourceSize": 1024,
-	"batchSize": 10000
+	"batchSize": 1000
 }

@@ -73,7 +73,7 @@ export async function naiveAlgorithm(lilURL: string, resources: Resource[], vers
     // step 2: add all resources to correct bucket
     // calculate correct bucket for each resources
     const metadataStore = await lil.readMetadata()
-
+    
     const metadata = MetadataParser.extractLDESinLDPMetadata(metadataStore, lilURL + "#EventStream")
 
 
