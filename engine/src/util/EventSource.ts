@@ -193,22 +193,21 @@ export async function addResourcesToBuckets(bucketResources: BucketResources, me
             }
             const response = await ldpComm.post(containerURL, resourceToOptimisedTurtle(store.getQuads(null, null, null, null), prefixes));
             // const response = await ldpComm.post(containerURL, resourceToOptimisedTurtle(resource, prefixes));
-            // let date_relation = undefined;
-            // for (let quad of store) {
-            //     if (date_relation === undefined) {
-            //         if (quad.predicate.value === metadata.view.relations[0].path) {
-            //             // TODO : add tree member here.
-            //             date_relation = new Date(quad.object.value)
-            //             await appendRelationToPage({
-            //                 communication: ldpComm,
-            //                 containerURL: containerURL,
-            //                 metadata: metadata,
-            //                 date: date_relation,
-            //                 resourceURL: response.headers.get('location')!,
-            //             })
-            //         }
-            //     }
-            // }
+            let date_relation = undefined;
+            for (let quad of store) {
+                if (date_relation === undefined) {
+                    if (quad.predicate.value === metadata.view.relations[0].path) {
+                        date_relation = new Date(quad.object.value)
+                        await appendRelationToPage({
+                            communication: ldpComm,
+                            containerURL: containerURL,
+                            metadata: metadata,
+                            date: date_relation,
+                            resourceURL: response.headers.get('location')!,
+                        })
+                    }
+                }
+            }
             // console.log(`Resource stored at: ${response.headers.get('location')} | status: ${response.status}`)
             // TODO: handle when status is not 201 (Http Created)
         }
