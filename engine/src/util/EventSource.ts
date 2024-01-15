@@ -188,26 +188,26 @@ export async function addResourcesToBuckets(bucketResources: BucketResources, me
         for (const resource of bucketResources[containerURL]) {
             let store = new Store(resource);
             let eventStream = modifyUrl(containerURL);
-            for (let quad of store){
+            for (let quad of store) {
                 store.addQuad(namedNode(eventStream), namedNode(TREE.member), namedNode(quad.subject.value));
             }
-            const response = await ldpComm.post(containerURL, resourceToOptimisedTurtle(store.getQuads(null, null, null, null), prefixes));
-            // const response = await ldpComm.post(containerURL, resourceToOptimisedTurtle(resource, prefixes));
-            let date_relation = undefined;
-            for (let quad of store) {
-                if (date_relation === undefined) {
-                    if (quad.predicate.value === metadata.view.relations[0].path) {
-                        date_relation = new Date(quad.object.value)
-                        await appendRelationToPage({
-                            communication: ldpComm,
-                            containerURL: containerURL,
-                            metadata: metadata,
-                            date: date_relation,
-                            resourceURL: response.headers.get('location')!,
-                        })
+            const response = await ldpComm.post(containerURL, resourceToOptimisedTurtle(store.getQuads(null, null, null, null), prefixes)).then(async (response) => {
+                let date_relation = undefined;
+                for (let quad of store) {
+                    if (date_relation === undefined) {
+                        if (quad.predicate.value === metadata.view.relations[0].path) {
+                            date_relation = new Date(quad.object.value)
+                            await appendRelationToPage({
+                                communication: ldpComm,
+                                containerURL: containerURL,
+                                metadata: metadata,
+                                date: date_relation,
+                                resourceURL: response.headers.get('location')!,
+                            })
+                        }
                     }
                 }
-            }
+            });
             // console.log(`Resource stored at: ${response.headers.get('location')} | status: ${response.status}`)
             // TODO: handle when status is not 201 (Http Created)
         }
@@ -216,30 +216,30 @@ export async function addResourcesToBuckets(bucketResources: BucketResources, me
 
 function modifyUrl(inputUrl: string): string {
     // Find the last index of "/"
-    let lastIndex = inputUrl.lastIndexOf("/"); 
+    let lastIndex = inputUrl.lastIndexOf("/");
     const secondLastIndex = getSecondLastIndex(inputUrl, "/");
     lastIndex = secondLastIndex;
-    
+
     if (lastIndex !== -1) {
-      // Extract the part of the string before the last "/"
-      const strippedPart = inputUrl.substring(0, lastIndex);
-      
-      // Append "#EventStream" to the stripped part
-      const modifiedUrl = strippedPart + "/#EventStream";
-      
-      return modifiedUrl;
+        // Extract the part of the string before the last "/"
+        const strippedPart = inputUrl.substring(0, lastIndex);
+
+        // Append "#EventStream" to the stripped part
+        const modifiedUrl = strippedPart + "/#EventStream";
+
+        return modifiedUrl;
     } else {
-      // If "/" is not found, return the original URL
-      return inputUrl;
+        // If "/" is not found, return the original URL
+        return inputUrl;
     }
-  }
-  
-  function getSecondLastIndex(inputString: string, char: string): number {
+}
+
+function getSecondLastIndex(inputString: string, char: string): number {
     const lastIndex = inputString.lastIndexOf(char);
     if (lastIndex !== -1) {
-      const secondLastIndex = inputString.lastIndexOf(char, lastIndex - 1);
-      return secondLastIndex;
+        const secondLastIndex = inputString.lastIndexOf(char, lastIndex - 1);
+        return secondLastIndex;
     } else {
-      return -1; // Character not found
+        return -1; // Character not found
     }
-  }
+}
