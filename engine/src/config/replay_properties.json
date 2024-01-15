@@ -11,8 +11,8 @@
 	"rateLimit": 100,
 	"_comment_": "insert the number of members per resource here, e.g. 10",
 	"membersPerResource": 10,
-	"chunkSize": 1000,
-	"bucketSize": 1000,
+	"chunkSize": 50,
+	"bucketSize": 50,
 	"targetResourceSize": 1024,
-	"batchSize": 1000
+	"batchSize": 50
 }

@@ -3,6 +3,7 @@ import {
     DCT,
     extractTimestampFromLiteral,
     ILDESinLDPMetadata,
+    isContainerIdentifier,
     LDPCommunication,
     TREE,
     turtleStringToStore
@@ -242,4 +243,17 @@ function getSecondLastIndex(inputString: string, char: string): number {
     } else {
         return -1; // Character not found
     }
+}
+
+
+export async function createContainer(resourceIdentifier: string, communication: LDPCommunication): Promise<void> {
+    if (!isContainerIdentifier(resourceIdentifier)) {
+        throw Error(`Tried creating a container at URL ${resourceIdentifier}, however this is not a Container (due to slash semantics).`)
+    }
+    const response = await communication.put(resourceIdentifier)
+
+    if (response.status !== 201) {
+        throw Error(`The container ${resourceIdentifier} was not created | status code: ${response.status}`)
+    }
+    console.log(`LDP Container created: ${response.url}`)
 }

@@ -11,16 +11,18 @@ import {
     LDP,
     MetadataParser,
     SolidCommunication,
+    isContainerIdentifier,
     storeToString,
     turtleStringToStore
 } from "@treecg/versionawareldesinldp";
 import { addResourcesToBuckets, calculateBucket, createBucketUrl, getTimeStamp, Resource } from "../util/EventSource";
 import { editMetadata, removeRelationFromPage } from "../util/Util";
 import { Store } from "n3";
-import { addRelationToNode, createContainer } from "@treecg/versionawareldesinldp/dist/ldes/Util";
+import { addRelationToNode} from "@treecg/versionawareldesinldp/dist/ldes/Util";
 import { Logger } from "@treecg/versionawareldesinldp/dist/logging/Logger";
 import { performance, PerformanceObserver } from "perf_hooks";
 import { RateLimitedLDPCommunication } from "rate-limited-ldp-communication";
+import { response } from "express";
 
 /**
  * In order to correctly rebalance the container,
@@ -68,11 +70,10 @@ export async function rebalanceContainer(ldpCommunication: SolidCommunication | 
     const resourcesLocationMap: Map<Resource, string> = new Map()
     for (const resourceSubject of containerStore.getObjects(containerURL, LDP.contains, null)) {
         const resourceURL = resourceSubject.value;
-        const response = await ldpCommunication.get(resourceURL) // also possible to fail
+        const response = await ldpCommunication.get(resourceURL); // this can fail.
         const resourceStore = await turtleStringToStore(await response.text(), resourceURL)
         const resource = resourceStore.getQuads(null, null, null, null)
         resources.push(resource)
-
         resourcesLocationMap.set(resource, resourceURL)
     }
     resources.sort((a, b) => {
@@ -159,6 +160,7 @@ export async function rebalanceContainer(ldpCommunication: SolidCommunication | 
 
     // update root
     const insertBody = `INSERT DATA { ${storeToString(updateToRoot)}}`
+    console.log(`Metadata of ${metadata.view.id} is being updated.`);
     await editMetadata(metadata.view.id, ldpCommunication, insertBody) // again assumption that there is only 1 view
 
     performance.mark(step4);
@@ -194,4 +196,12 @@ export async function rebalanceContainer(ldpCommunication: SolidCommunication | 
         end: step4,
         detail: containerURL
     });
+}
+
+export async function createContainer(resourceIdentifier: string, communication: SolidCommunication | RateLimitedLDPCommunication): Promise<void> {
+    if (!isContainerIdentifier(resourceIdentifier)) {
+        throw Error(`Tried creating a container at URL ${resourceIdentifier}, however this is not a Container (due to slash semantics).`)
+    }
+    const response = await communication.put(resourceIdentifier)
+    console.log(`LDP Container created: ${response.url}`)
 }

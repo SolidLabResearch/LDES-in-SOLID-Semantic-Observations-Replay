@@ -39,12 +39,16 @@ export function convertLdesMetadata(metadata: LDESMetadata): Store {
 
 export async function editMetadata(resourceIdentifier: string, communication: Communication, body: string): Promise<void> {
     const logger = new Logger(editMetadata.name)
-    const response = await communication.patch(resourceIdentifier + '.meta', body)
+    console.log("Editing metadata of " + resourceIdentifier);
+    const response = await communication.patch(resourceIdentifier + '.meta', body);
+    
+    if (response.status === 409){
+        logger.error("409 Conflict: " + await response.text())
+    }
     if (response.status !== 205) {
         logger.error("Something went wrong when trying to patch the root. This MUST NOT HAPPEN")
         logger.error("Body that should have been inserted: " + body)
         logger.error(await response.text())
-        throw new Error("Something went wrong when trying to patch the root")
     }
 }
 

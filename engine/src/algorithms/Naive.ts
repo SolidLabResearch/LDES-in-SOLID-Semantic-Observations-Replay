@@ -135,7 +135,7 @@ export async function naiveAlgorithm(lilURL: string, resources: Resource[], vers
     // go over each bucket over the LDES that has more than 100 resources
     // and create new buckets such that at the end there are less than 100 per bucket.
     for (const bucketURL of Object.keys(bucketResources)) {
-        // await rebalanceContainer(comm, metadata, bucketURL, bucketSize, prefixes)
+        await rebalanceContainer(comm, metadata, bucketURL, bucketSize, prefixes)
     }
     performance.mark(step3);
 
