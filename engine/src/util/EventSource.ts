@@ -185,20 +185,22 @@ export async function addResourcesToBuckets(bucketResources: BucketResources, me
     for (const containerURL of Object.keys(bucketResources)) {
         for (const resource of bucketResources[containerURL]) {
             const response = await ldpComm.post(containerURL, resourceToOptimisedTurtle(resource, prefixes));
-            // check how you would handle the resource timestamp. and extract. and add to metadata
-            let date_relation = new Date()
-            for (let quad of resource) {
-                if (quad.predicate.value === metadata.view.relations[0].path) {
-                    date_relation = new Date(quad.object.value)
+            let store = new Store(resource);
+            let date_relation = undefined;
+            for (let quad of store) {
+                if (date_relation === undefined) {
+                    if (quad.predicate.value === metadata.view.relations[0].path) {
+                        date_relation = new Date(quad.object.value)
+                        await appendRelationToPage({
+                            communication: ldpComm,
+                            containerURL: containerURL,
+                            metadata: metadata,
+                            date: date_relation,
+                            resourceURL: response.headers.get('location')!,
+                        })
+                    }
                 }
             }
-            await appendRelationToPage({
-                communication: ldpComm,
-                containerURL: containerURL,
-                metadata: metadata,
-                date: date_relation,
-                resourceURL: response.headers.get('location')!,
-            })
             // console.log(`Resource stored at: ${response.headers.get('location')} | status: ${response.status}`)
             // TODO: handle when status is not 201 (Http Created)
         }
