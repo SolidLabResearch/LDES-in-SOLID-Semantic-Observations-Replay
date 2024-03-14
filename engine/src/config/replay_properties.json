@@ -1,14 +1,15 @@
 {
 	"port": "3001",
-	"loglevel": "info",
+	"loglevel": "debug",
 	"logname": "WEB API",
 	"__comment__" : "enter the location of your dataset folder below this in datasetFolders field. e.g. /home/data/",
 	"datasetFolders": "C:\\data",
 	"credentialsFileName": null,
-	"lilURL": "http://localhost:3000/test/",
+	"lilURL": "http://localhost:3000/test_protegoClone/",
 	"treePath": "https://saref.etsi.org/core/hasTimestamp",
 	"chunkSize": 10,
 	"bucketSize": 1000,
 	"targetResourceSize": 1024,
-	"batchSize": 10000
+	"batchSize": 10000,
+	"original_timestamp": false
 }
