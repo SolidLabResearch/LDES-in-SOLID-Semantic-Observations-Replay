@@ -9,6 +9,7 @@ import {
     DCT,
     ILDESinLDPMetadata,
     LDP,
+    LDPCommunication,
     MetadataParser,
     SolidCommunication,
     isContainerIdentifier,
@@ -21,8 +22,6 @@ import { Store } from "n3";
 import { addRelationToNode} from "@treecg/versionawareldesinldp/dist/ldes/Util";
 import { Logger } from "@treecg/versionawareldesinldp/dist/logging/Logger";
 import { performance, PerformanceObserver } from "perf_hooks";
-import { RateLimitedLDPCommunication } from "rate-limited-ldp-communication";
-import { response } from "express";
 
 /**
  * In order to correctly rebalance the container,
@@ -34,7 +33,7 @@ import { response } from "express";
  * @param loglevel
  * @returns {Promise<void>}
  */
-export async function rebalanceContainer(ldpCommunication: SolidCommunication | RateLimitedLDPCommunication, metadata: ILDESinLDPMetadata, containerURL: string,
+export async function rebalanceContainer(ldpCommunication: SolidCommunication | LDPCommunication, metadata: ILDESinLDPMetadata, containerURL: string,
     bucketSize: number, prefixes: any, loglevel: string = 'info'): Promise<void> {
 
     const logger = new Logger(rebalanceContainer.name, loglevel)
@@ -73,7 +72,6 @@ export async function rebalanceContainer(ldpCommunication: SolidCommunication | 
         const response = await ldpCommunication.get(resourceURL); // this can fail.
         const resourceStore = await turtleStringToStore(await response.text(), resourceURL)
         const resource = resourceStore.getQuads(null, null, null, null)
-        resources.push(resource)
         resourcesLocationMap.set(resource, resourceURL)
     }
     resources.sort((a, b) => {
@@ -198,7 +196,7 @@ export async function rebalanceContainer(ldpCommunication: SolidCommunication | 
     });
 }
 
-export async function createContainer(resourceIdentifier: string, communication: SolidCommunication | RateLimitedLDPCommunication): Promise<void> {
+export async function createContainer(resourceIdentifier: string, communication: SolidCommunication | LDPCommunication): Promise<void> {
     if (!isContainerIdentifier(resourceIdentifier)) {
         throw Error(`Tried creating a container at URL ${resourceIdentifier}, however this is not a Container (due to slash semantics).`)
     }
