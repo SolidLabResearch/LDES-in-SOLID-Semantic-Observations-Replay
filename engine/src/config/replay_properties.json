@@ -3,9 +3,9 @@
 	"loglevel": "info",
 	"logname": "WEB API",
 	"__comment__" : "enter the location of your dataset folder below this in datasetFolders field. e.g. /home/data/",
-	"datasetFolders": "/home/kush/Code/feather-RDF-mapper/data/rdfData",
+	"datasetFolders": "/home/kush/Code/feather-RDF-mapper/data/rdfData/skt/",
 	"credentialsFileName": null,
-	"lilURL": "http://localhost:3000/dataset_participant1/xyz/",
+	"lilURL": "http://localhost:3000/aggregation_pod/xyz/",
 	"treePath": "https://saref.etsi.org/core/hasTimestamp",
 	"___comment___": "insert the number of HTTP requests to make here, e.g 20",
 	"rateLimit": 100,
@@ -14,5 +14,7 @@
 	"chunkSize": 50,
 	"bucketSize": 50,
 	"targetResourceSize": 1024,
-	"batchSize": 50
+	"batchSize": 50,
+	"original_timestamp": false
+
 }

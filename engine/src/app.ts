@@ -93,6 +93,8 @@ const chunkSize = propsJson.chunkSize;
 const bucketSize = propsJson.bucketSize;
 //Targetted Resource Size per bucket.
 const targetResourceSize = propsJson.targetResourceSize;
+//This const defines whether or not the timestamp should be refactored according to the current situation.
+const originalTimestamp = propsJson.original_timestamp;
 
 const event = new Subject();
 
@@ -112,7 +114,7 @@ var sortedObservationSubjects: Array<Resource>;
 var observationPointer: number = 0;
 //Internal variable to keep track of the Authentication session object in case needed.
 var session;
-//This variabele defined whether or not the autoplay function is enabled
+//This variabele defines whether or not the autoplay function is enabled
 var autoplay = false;
 //Time-out until the next observation to be replayed.
 var newDifference;
@@ -397,9 +399,30 @@ async function advanceOneObservation() {
 		logger.info("Retrieving all related information to the Observation being replayed.");
 		let finalResources = [];
 		let tempResources = [];
-		for (const quad of store.match(sortedObservationSubjects[observationPointerTemp], null, null)) {
-			logger.debug(quad);
-			tempResources.push(quad);
+		for (var pquad of store.match(sortedObservationSubjects[observationPointerTemp], null, null)) {
+			logger.debug(pquad);
+			logger.debug("-->" + pquad.predicate.value);
+			if (pquad.predicate.value == "https://saref.etsi.org/core/hasTimestamp") {
+				logger.debug("Timestamp? TRUE");
+				if (!originalTimestamp) {
+					let d = new Date().toISOString();
+					logger.debug(d);
+					//logger.debug(Date.now().toISOString());
+					logger.debug(pquad.object.termType);
+
+					var myQuad = quad(
+						pquad.subject, // Subject
+						pquad.predicate,    // Predicate
+						literal(d, namedNode("http://www.w3.org/2001/XMLSchema#dateTime")),                              // Object
+						defaultGraph(),                                      // Graph
+					);
+					logger.info(myQuad);
+					tempResources.push(myQuad);
+				}
+			} else {
+				logger.debug("Timestamp? FALSE");
+				tempResources.push(pquad);
+			}
 		}
 		finalResources.push(tempResources);
 		logger.debug(finalResources + "");
@@ -435,7 +458,7 @@ async function advanceOneObservation() {
 		logger.info("Naive algorithm (SINGLE): Execution for " + amountResources + " resources with a bucket size of " + bucketSize);
 
 		logger.debug(lilURL);
-		logger.debug(finalResources + "");
+		logger.info("FINAL RESOURCES: " + finalResources);
 		logger.debug(treePath);
 		logger.debug(bucketSize + "");
 		logger.debug(config + "");
@@ -538,10 +561,8 @@ app.get('/advanceAndPushObservationPointerToTheEnd', async (req, res) => {
 		// assume every sourceResource entry is of the same length (on average) to calculate the number of resources
 		// that are to be grouped together
 		logger.debug("targetResourceSize: " + targetResourceSize);
-		const resourceGroupCount = propsJson.membersPerResource;
-		// const resourceGroupCount = 1 + Math.floor(targetResourceSize / resourceToOptimisedTurtle(finalResources[0], prefixes).length);
+		const resourceGroupCount = 1 + Math.floor(targetResourceSize / resourceToOptimisedTurtle(finalResources[0], prefixes).length);
 		const resources = batchResources(finalResources, resourceGroupCount);
-		
 
 		let amountResources: number = amount
 		// if input is not a number use the entire collection
@@ -570,7 +591,9 @@ app.get('/advanceAndPushObservationPointerToTheEnd', async (req, res) => {
 		logger.debug(session);
 		logger.debug(loglevel);
 
-		await naiveAlgorithm(lilURL, resources, treePath, bucketSize, config, prefixes, session, loglevel);
+
+		await naiveAlgorithm(lilURL, finalResources, treePath, bucketSize, config, prefixes, session, loglevel);
+
 	}
 
 	res.send(jsonResult);
