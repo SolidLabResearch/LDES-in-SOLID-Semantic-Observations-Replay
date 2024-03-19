@@ -251,9 +251,5 @@ export async function createContainer(resourceIdentifier: string, communication:
         throw Error(`Tried creating a container at URL ${resourceIdentifier}, however this is not a Container (due to slash semantics).`)
     }
     const response = await communication.put(resourceIdentifier)
-
-    if (response.status !== 201) {
-        throw Error(`The container ${resourceIdentifier} was not created | status code: ${response.status}`)
-    }
     console.log(`LDP Container created: ${response.url}`)
 }

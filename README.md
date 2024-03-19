@@ -71,6 +71,7 @@ Below you find more information properties used in the `replay_properties.json` 
 10. "chunkSize": 10 ==> For visualisation purposes, defines how many of the Observations are to be displayed when requested by the webapp (support parameter),
 11. "bucketSize": 10 ==> How many observations should be contained in a single bucket of the LDES,
 12. "targetResourceSize": 1024 ==> Target size of the resources on disk, this is a rough estimate and belongs to the Solid Event Sourcing implementation (https://github.com/woutslabbinck/SolidEventSourcing).
+13. "original_timestamp": true ==> If true, the original timestamp of the observation is used, if false, a new timestamp is generated on the fly.
 
 
 #### testing / API description:
@@ -119,7 +120,14 @@ Below you find more information properties used in the `replay_properties.json` 
    ```shell
    [{"termType":"NamedNode","value":"https://dahcc.idlab.ugent.be/Protego/_participant1/obs0"},{"termType":"NamedNode","value":"https://dahcc.idlab.ugent.be/Protego/_participant1/obs1"} ...}]
    ```
-7. Replay one next observation using a GET request via
+
+There are two ways to replay the observations:
+ - With the original timestamps which are the input timestamps from the replayer file you loaded, or
+ - With new timestamps which are generated on the fly by the replayer to imitate the real-time behaviour of the data stream.
+
+To replay the observations with the original timestamps, follow the steps below:
+
+1. Replay one next observation using a GET request via
    ```shell
    curl http://localhost:3001/advanceAndPushObservationPointer
    ```
@@ -133,10 +141,18 @@ Below you find more information properties used in the `replay_properties.json` 
    where the LDES buckets should now contain the replayed observation, 
    e.g. http://localhost:3000/test/1641197095000/aa28a2fa-010f-4b81-8f3c-a57f45e13758.
 
-8. Replay all remaining observations using a GET request via
+2. Replay all remaining observations using a GET request via
    ```shell
    curl http://localhost:3001/advanceAndPushObservationPointerToTheEnd
    ```
+
+To replay the observations with new timestamps, follow the steps below:
+1. Start the auto replayer behaviour by triggering the following GET request via
+   ```shell
+   curl http://localhost:3001/startAutoReplay
+   ```
+   This will start replaying the observations with new timestamps at the rate of the time difference between the observations.
+
    
 ### Web app: 
 
@@ -210,7 +226,7 @@ You find a screen below.
 https://user-images.githubusercontent.com/19285142/230097455-26d40ebd-6852-4372-9057-81698d74e93e.mp4
 
 ## Support
-Stijn.Verstichel@UGent.be
+Contact Stijn.Verstichel@UGent.be for support or open a GitHub issue [here](https://github.com/SolidLabResearch/LDES-in-SOLID-Semantic-Observations-Replay/issues) in the repository.
 
 ## Roadmap
 A connector is required that investigates the LDES, computes the need for a new bucket and adds the events of the stream either to a new bucket or to an existing one based on the timestamps of these events. In more detail the following functionality is required:
@@ -231,6 +247,9 @@ The replayer should be a library that allows to:
 - [ ] assign new timestamps to the replayed events(the property should be configurable),
 - [ ] configure the event shape (to know which triples belong to each event), and
 - [ ] optionally first map raw data, e.g. CSV, to RDF
+
+## License
+This code is copyrighted by [Ghent University - imec](https://www.ugent.be/ea/idlab/en) and released under the [MIT License](LICENCE.md)
 
 
 

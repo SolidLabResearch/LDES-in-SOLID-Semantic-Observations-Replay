@@ -18,7 +18,8 @@ import {
     storeToString
 } from "@treecg/versionawareldesinldp";
 import {Session} from "@rubensworks/solid-client-authn-isomorphic"
-import {addRelationToNode, createContainer} from "@treecg/versionawareldesinldp/dist/ldes/Util";
+import {addRelationToNode} from "@treecg/versionawareldesinldp/dist/ldes/Util";
+import { createContainer } from "./NaiveRebalancing";
 import {DataFactory, Store} from "n3";
 import {rebalanceContainer} from "./NaiveRebalancing";
 import {Logger} from "@treecg/versionawareldesinldp/dist/logging/Logger";
@@ -31,7 +32,7 @@ const {quad, namedNode} = DataFactory
 /** Algorithm A
  *
  *  * step 1: check whether ldes is initialised
- *    * init ldes when not
+ *    * init ldes when nots
  *  * step 2: add all resources to correct bucket
  *  * step 3: rebalance
  *

@@ -371,7 +371,7 @@ async function advanceOneObservation() {
 		logger.info("Retrieving metadata of LDESinLDP if it already exists.");
 		const comm = session ? new SolidCommunication(session) : new LDPCommunication();
 		const lil = new LDESinLDP(lilURL, comm);
-		let metadata: LDESMetadata | undefined
+		let metadata: LDESMetadata;
 
 		try {
 			const metadataStore = await lil.readMetadata()
@@ -380,6 +380,8 @@ async function advanceOneObservation() {
 				logger.info(`Multiple LDESes detected. ${ldes[0].value} was extracted`)
 			}
 			metadata = extractLdesMetadata(metadataStore, ldes[0].value)
+			console.log(metadata.ldesEventStreamIdentifier);
+			
 		} catch (e) {
 			logger.info("NO LDES PRESENT");
 			// the LDES in LDP does not exist if this fails -> there is no metadata.

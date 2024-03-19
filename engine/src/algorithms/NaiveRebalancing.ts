@@ -8,6 +8,7 @@
 import {
     DCT,
     ILDESinLDPMetadata,
+    LDESMetadata,
     LDP,
     LDPCommunication,
     MetadataParser,
@@ -19,7 +20,7 @@ import {
 import { addResourcesToBuckets, calculateBucket, createBucketUrl, getTimeStamp, Resource } from "../util/EventSource";
 import { editMetadata, removeRelationFromPage } from "../util/Util";
 import { Store } from "n3";
-import { addRelationToNode} from "@treecg/versionawareldesinldp/dist/ldes/Util";
+import { addRelationToNode } from "@treecg/versionawareldesinldp/dist/ldes/Util";
 import { Logger } from "@treecg/versionawareldesinldp/dist/logging/Logger";
 import { performance, PerformanceObserver } from "perf_hooks";
 
@@ -36,7 +37,7 @@ import { performance, PerformanceObserver } from "perf_hooks";
 export async function rebalanceContainer(ldpCommunication: SolidCommunication | LDPCommunication, metadata: ILDESinLDPMetadata, containerURL: string,
     bucketSize: number, prefixes: any, loglevel: string = 'info'): Promise<void> {
 
-    const logger = new Logger(rebalanceContainer.name, loglevel)
+    const logger = new Logger(rebalanceContainer.name, loglevel);
     // https://dev.to/typescripttv/measure-execution-times-in-browsers-node-js-js-ts-1kik
     // extra filter step to be unique
     const observer = new PerformanceObserver(list => list.getEntries().filter(entry => entry.detail === containerURL)
@@ -52,7 +53,7 @@ export async function rebalanceContainer(ldpCommunication: SolidCommunication | 
     performance.mark(markStart);
 
     // used to be metadata.timestamppath in old code | especially in lil it is the treePath
-    const timestampPath = metadata.view.relations[0].path ?? DCT.created
+    const timestampPath = metadata.view.relations[0].path ?? "https://saref.etsi.org/core/hasTimestamp";
     const containerResponse = await ldpCommunication.get(containerURL)
     const containerStore = await turtleStringToStore(await containerResponse.text(), containerURL)
     const amountResources = containerStore.countQuads(containerURL, LDP.contains, null, null)
@@ -69,14 +70,23 @@ export async function rebalanceContainer(ldpCommunication: SolidCommunication | 
     const resourcesLocationMap: Map<Resource, string> = new Map()
     for (const resourceSubject of containerStore.getObjects(containerURL, LDP.contains, null)) {
         const resourceURL = resourceSubject.value;
-        const response = await ldpCommunication.get(resourceURL); // this can fail.
-        const resourceStore = await turtleStringToStore(await response.text(), resourceURL)
-        const resource = resourceStore.getQuads(null, null, null, null)
-        resourcesLocationMap.set(resource, resourceURL)
+        const response = await ldpCommunication.get(resourceURL); // this can fail.);
+        if (response.ok) {
+            const resourceStore = await turtleStringToStore(await response.text(), resourceURL)
+            const resource = resourceStore.getQuads(null, null, null, null)
+            resourcesLocationMap.set(resource, resourceURL);
+            resources.push(resource);
+        } else {
+            logger.error(`Resource ${resourceURL} could not be fetched.`);
+        }
     }
     resources.sort((a, b) => {
         const timeA = getTimeStamp(a, timestampPath)
-        const timeB = getTimeStamp(b, timestampPath)
+        const timeB = getTimeStamp(b, timestampPath);
+        if (timeA === undefined || timeB === undefined) {
+            logger.error('Timestamp of resource is undefined.')
+            return 0;
+        }
         // if a > b <=> a -b > 0 <=> a is bigger than b <=> sort a after b
         // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort#description
         return timeA - timeB
@@ -93,23 +103,31 @@ export async function rebalanceContainer(ldpCommunication: SolidCommunication | 
     const amountNewBuckets = Math.floor((amountResources - 1) / bucketSize) // minus one for correct amount
     const indexes = Array.from(Array(amountNewBuckets).keys()).map(value => (value + 1) * bucketSize) // https://stackoverflow.com/a/36953272
     for (const index of indexes) {
-        const timestamp = getTimeStamp(resources[index], timestampPath)
-        const newURL = createBucketUrl(containerURL, timestamp)
-        bucketResources[newURL] = []
-        logger.debug(newURL + ' | for timestamp: ' + new Date(timestamp).toISOString())
+        // TODO : check why resource[index] is undefined. 
+        if (resources[index] === undefined) {
+            logger.error('Resource at index ' + index + ' is undefined.')
+        } else {
+            const timestamp = getTimeStamp(resources[index], timestampPath)
+            if (timestamp === undefined) {
+                logger.error('Timestamp of resource is undefined.')
+                return;
+            }
+            const newURL = createBucketUrl(containerURL, timestamp)
+            bucketResources[newURL] = []
+            logger.debug(newURL + ' | for timestamp: ' + new Date(timestamp).toISOString())
 
-        const relationConfig = {
-            date: new Date(timestamp),
-            nodeIdentifier: metadata.view.id, // Note: we assume one rootnode
-            treePath: timestampPath
+            const relationConfig = {
+                date: new Date(timestamp),
+                nodeIdentifier: metadata.view.id, // Note: we assume one rootnode
+                treePath: timestampPath
+            }
+            // add bucket to metadataStore
+            addRelationToNode(metadataStore, relationConfig)
+
+            // add relation to store that is responsible for updating the root node
+            addRelationToNode(updateToRoot, relationConfig)
         }
-        // add bucket to metadataStore
-        addRelationToNode(metadataStore, relationConfig)
-
-        // add relation to store that is responsible for updating the root node
-        addRelationToNode(updateToRoot, relationConfig)
     }
-
     // convert as the new metadata of the ldes
     const updatedMetadata = MetadataParser.extractLDESinLDPMetadata(metadataStore, metadata.eventStreamIdentifier)
 
@@ -127,7 +145,9 @@ export async function rebalanceContainer(ldpCommunication: SolidCommunication | 
 
     // 3b: create buckets
     for (const containerURL of Object.keys(bucketResources)) {
-        await createContainer(containerURL, ldpCommunication)
+        await createContainer(containerURL, ldpCommunication).then(async () => {
+            console.log(`Container ${containerURL} created.`);
+        })
     }
     performance.mark(step2);
 
@@ -165,6 +185,8 @@ export async function rebalanceContainer(ldpCommunication: SolidCommunication | 
 
     // TODO: functionality that deals with inbox (which might have to be swapped)
 
+
+
     // 3e: check if resources in starting bucket are within its bounds
 
     // time measurements
@@ -200,6 +222,23 @@ export async function createContainer(resourceIdentifier: string, communication:
     if (!isContainerIdentifier(resourceIdentifier)) {
         throw Error(`Tried creating a container at URL ${resourceIdentifier}, however this is not a Container (due to slash semantics).`)
     }
+    await update_inbox(communication, resourceIdentifier);
     const response = await communication.put(resourceIdentifier)
     console.log(`LDP Container created: ${response.url}`)
+}
+
+export async function update_inbox(communication: SolidCommunication | LDPCommunication, container_created_url: string) {
+    const ldes_identifier = container_created_url.replace(/\/\d+\//, "/")
+    await delete_existing_inbox(ldes_identifier, communication).then(async () => {
+        const response = await communication.patch(ldes_identifier + '.meta', `INSERT DATA { <${ldes_identifier}> <http://www.w3.org/ns/ldp#inbox> <${container_created_url}> }`);
+        if (response.status === 409) {
+            console.log(`Inbox already exists for ${ldes_identifier}`);
+        }
+        console.log(`Inbox updated for ${ldes_identifier}`);
+    });
+}
+
+export async function delete_existing_inbox(ldes_identifier: string, communication: SolidCommunication | LDPCommunication) {
+    const response = await communication.patch(ldes_identifier + '.meta', `DELETE { <${ldes_identifier}> <http://www.w3.org/ns/ldp#inbox> ?inbox } WHERE { <${ldes_identifier}> <http://www.w3.org/ns/ldp#inbox> ?inbox }`);
+    console.log(`Inbox deleted for ${ldes_identifier} with the response status: ${response.status}`);
 }
