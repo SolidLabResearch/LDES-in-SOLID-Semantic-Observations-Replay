@@ -4,7 +4,9 @@ import {
     extractTimestampFromLiteral,
     ILDESinLDPMetadata,
     isContainerIdentifier,
+    LDESinLDP,
     LDPCommunication,
+    sleep,
     TREE,
     turtleStringToStore
 } from "@treecg/versionawareldesinldp";
@@ -183,34 +185,68 @@ export function resourceToOptimisedTurtle(resource: Resource, _prefixes: any): s
  * @param ldpComm
  * @returns {Promise<void>}
  */
-export async function addResourcesToBuckets(bucketResources: BucketResources, metadata: ILDESinLDPMetadata, ldpComm: LDPCommunication, prefixes: any) {
+export async function addResourcesToBuckets(bucketResources: BucketResources, metadata: ILDESinLDPMetadata, ldpComm: LDPCommunication, prefixes: any, ldes_in_ldp: LDESinLDP) {
     for (const containerURL of Object.keys(bucketResources)) {
-
         for (const resource of bucketResources[containerURL]) {
             let store = new Store(resource);
             let eventStream = modifyUrl(containerURL);
             for (let quad of store) {
                 store.addQuad(namedNode(eventStream), namedNode(TREE.member), namedNode(quad.subject.value));
             }
-            const response = await ldpComm.post(containerURL, resourceToOptimisedTurtle(store.getQuads(null, null, null, null), prefixes)).then(async (response) => {
-                let date_relation = undefined;
-                for (let quad of store) {
-                    if (date_relation === undefined) {
-                        if (quad.predicate.value === metadata.view.relations[0].path) {
-                            date_relation = new Date(quad.object.value)
-                            await appendRelationToPage({
-                                communication: ldpComm,
-                                containerURL: containerURL,
-                                metadata: metadata,
-                                date: date_relation,
-                                resourceURL: response.headers.get('location')!,
-                            })
+            let ldes_status = await ldes_in_ldp.status();
+            if (ldes_status.valid) {
+                try {
+                    const response = await ldpComm.post(containerURL, resourceToOptimisedTurtle(store.getQuads(null, null, null, null), prefixes)).then(async (response) => {
+                        let date_relation = undefined;
+                        for (let quad of store) {
+                            if (date_relation === undefined) {
+                                if (quad.predicate.value === metadata.view.relations[0].path) {
+                                    date_relation = new Date(quad.object.value)
+                                    await appendRelationToPage({
+                                        communication: ldpComm,
+                                        containerURL: containerURL,
+                                        metadata: metadata,
+                                        date: date_relation,
+                                        resourceURL: response.headers.get('location')!,
+                                    })
+                                }
+                            }
                         }
-                    }
+                    });
+                    // console.log(`Resource stored at: ${response.headers.get('location')} | status: ${response.status}`)
+                    // TODO: handle when status is not 201 (Http Created)
+                } catch (error) {
+                    console.error(`Error while adding resource to container ${containerURL}: ${error}`)
                 }
-            });
-            // console.log(`Resource stored at: ${response.headers.get('location')} | status: ${response.status}`)
-            // TODO: handle when status is not 201 (Http Created)
+            }
+            else {
+                sleep(10000);
+                try {
+                    const response = await ldpComm.post(containerURL, resourceToOptimisedTurtle(store.getQuads(null, null, null, null), prefixes)).then(async (response) => {
+                        let date_relation = undefined;
+                        for (let quad of store) {
+                            if (date_relation === undefined) {
+                                if (quad.predicate.value === metadata.view.relations[0].path) {
+                                    date_relation = new Date(quad.object.value)
+                                    await appendRelationToPage({
+                                        communication: ldpComm,
+                                        containerURL: containerURL,
+                                        metadata: metadata,
+                                        date: date_relation,
+                                        resourceURL: response.headers.get('location')!,
+                                    })
+                                }
+                            }
+                        }
+                    });
+                    // console.log(`Resource stored at: ${response.headers.get('location')} | status: ${response.status}`)
+                    // TODO: handle when status is not 201 (Http Created)
+                } catch (error) {
+                    console.error(`Error while adding resource to container ${containerURL}: ${error}`)
+                }
+                // throw new Error("The LDES is not valid, probably because the metadata is still being patched.");
+                // console.log(`The LDES is not valid, probably because the metadata is still being patched.`);
+            }
         }
     }
 }

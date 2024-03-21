@@ -9,6 +9,7 @@ import {
     DCT,
     ILDESinLDPMetadata,
     LDESMetadata,
+    LDESinLDP,
     LDP,
     LDPCommunication,
     MetadataParser,
@@ -35,7 +36,7 @@ import { performance, PerformanceObserver } from "perf_hooks";
  * @returns {Promise<void>}
  */
 export async function rebalanceContainer(ldpCommunication: SolidCommunication | LDPCommunication, metadata: ILDESinLDPMetadata, containerURL: string,
-    bucketSize: number, prefixes: any, loglevel: string = 'info'): Promise<void> {
+    bucketSize: number, prefixes: any, ldes_in_ldp: LDESinLDP, loglevel: string = 'info'): Promise<void> {
 
     const logger = new Logger(rebalanceContainer.name, loglevel);
     // https://dev.to/typescripttv/measure-execution-times-in-browsers-node-js-js-ts-1kik
@@ -122,7 +123,7 @@ export async function rebalanceContainer(ldpCommunication: SolidCommunication | 
                 treePath: timestampPath
             }
             // add bucket to metadataStore
-            addRelationToNode(metadataStore, relationConfig)
+            addRelationToNode(metadataStore, relationConfig);
 
             // add relation to store that is responsible for updating the root node
             addRelationToNode(updateToRoot, relationConfig)
@@ -145,14 +146,14 @@ export async function rebalanceContainer(ldpCommunication: SolidCommunication | 
 
     // 3b: create buckets
     for (const containerURL of Object.keys(bucketResources)) {
-        await createContainer(containerURL, ldpCommunication).then(async () => {
+        await createContainer(containerURL, ldpCommunication, ldes_in_ldp).then(async () => {
             console.log(`Container ${containerURL} created.`);
         })
     }
     performance.mark(step2);
 
     // 3c: Copy the resources to the new buckets
-    await addResourcesToBuckets(bucketResources, metadata, ldpCommunication, prefixes)
+    await addResourcesToBuckets(bucketResources, metadata, ldpCommunication, prefixes, ldes_in_ldp)
     performance.mark(step3);
 
     // 3d: Remove the old resources and add relations to the root
@@ -218,27 +219,39 @@ export async function rebalanceContainer(ldpCommunication: SolidCommunication | 
     });
 }
 
-export async function createContainer(resourceIdentifier: string, communication: SolidCommunication | LDPCommunication): Promise<void> {
-    if (!isContainerIdentifier(resourceIdentifier)) {
-        throw Error(`Tried creating a container at URL ${resourceIdentifier}, however this is not a Container (due to slash semantics).`)
-    }
-    await update_inbox(communication, resourceIdentifier);
-    const response = await communication.put(resourceIdentifier)
-    console.log(`LDP Container created: ${response.url}`)
-}
-
-export async function update_inbox(communication: SolidCommunication | LDPCommunication, container_created_url: string) {
-    const ldes_identifier = container_created_url.replace(/\/\d+\//, "/")
-    await delete_existing_inbox(ldes_identifier, communication).then(async () => {
-        const response = await communication.patch(ldes_identifier + '.meta', `INSERT DATA { <${ldes_identifier}> <http://www.w3.org/ns/ldp#inbox> <${container_created_url}> }`);
-        if (response.status === 409) {
-            console.log(`Inbox already exists for ${ldes_identifier}`);
+export async function createContainer(resourceIdentifier: string, communication: SolidCommunication | LDPCommunication, ldes_in_ldp: LDESinLDP): Promise<void> {
+    let ldes_status = await ldes_in_ldp.status();
+    if (ldes_status.valid) {
+        if (!isContainerIdentifier(resourceIdentifier)) {
+            throw Error(`Tried creating a container at URL ${resourceIdentifier}, however this is not a Container (due to slash semantics).`)
         }
-        console.log(`Inbox updated for ${ldes_identifier}`);
-    });
+        const response = await communication.put(resourceIdentifier)
+        await update_inbox(communication, resourceIdentifier, ldes_in_ldp);
+        console.log(`LDP Container created: ${response.url}`)
+    }
+    else {
+        console.error(`LDES in LDP is not valid, cannot create container.`);
+    }
 }
 
-export async function delete_existing_inbox(ldes_identifier: string, communication: SolidCommunication | LDPCommunication) {
-    const response = await communication.patch(ldes_identifier + '.meta', `DELETE { <${ldes_identifier}> <http://www.w3.org/ns/ldp#inbox> ?inbox } WHERE { <${ldes_identifier}> <http://www.w3.org/ns/ldp#inbox> ?inbox }`);
-    console.log(`Inbox deleted for ${ldes_identifier} with the response status: ${response.status}`);
+export async function update_inbox(communication: SolidCommunication | LDPCommunication, container_created_url: string, ldes_in_ldp: LDESinLDP) {
+    let ldes_status = await ldes_in_ldp.status();
+    if (ldes_status.valid) {
+        const ldes_identifier = container_created_url.replace(/\/\d+\//, "/")
+        await delete_existing_inbox(ldes_identifier, communication, ldes_in_ldp).then(async () => {
+            const response = await communication.patch(ldes_identifier + '.meta', `INSERT DATA { <${ldes_identifier}> <http://www.w3.org/ns/ldp#inbox> <${container_created_url}> }`);
+            if (response.status === 409) {
+                console.log(`Inbox already exists for ${ldes_identifier}`);
+            }
+            console.log(`Inbox updated for ${ldes_identifier}`);
+        });
+    }
+}
+
+export async function delete_existing_inbox(ldes_identifier: string, communication: SolidCommunication | LDPCommunication, ldes_in_ldp: LDESinLDP) {
+    let ldes_status = await ldes_in_ldp.status();
+    if (ldes_status.valid) {
+        const response = await communication.patch(ldes_identifier + '.meta', `DELETE { <${ldes_identifier}> <http://www.w3.org/ns/ldp#inbox> ?inbox } WHERE { <${ldes_identifier}> <http://www.w3.org/ns/ldp#inbox> ?inbox }`);
+        console.log(`Inbox deleted for ${ldes_identifier} with the response status: ${response.status}`);
+    }
 }

@@ -112,7 +112,7 @@ export async function naiveAlgorithm(lilURL: string, resources: Resource[], vers
         const newContainerURL = lilURL + earliestResourceTs + "/"
         logger.debug("Creating new container at " + newContainerURL + " for those resources.")
 
-        await createContainer(newContainerURL, comm)
+        await createContainer(newContainerURL, comm, lil)
         const store = new Store()
         addRelationToNode(store, {
             date: new Date(earliestResourceTs),
@@ -127,7 +127,7 @@ export async function naiveAlgorithm(lilURL: string, resources: Resource[], vers
     }
     delete bucketResources["none"]
     // add resource to each bucket
-    await addResourcesToBuckets(bucketResources, metadata, comm, prefixes);
+    await addResourcesToBuckets(bucketResources, metadata, comm, prefixes, lil);
 
     performance.mark(step2);
 
@@ -135,7 +135,7 @@ export async function naiveAlgorithm(lilURL: string, resources: Resource[], vers
     // go over each bucket over the LDES that has more than 100 resources
     // and create new buckets such that at the end there are less than 100 per bucket.
     for (const bucketURL of Object.keys(bucketResources)) {
-        await rebalanceContainer(comm, metadata, bucketURL, bucketSize, prefixes)
+        await rebalanceContainer(comm, metadata, bucketURL, bucketSize, prefixes,lil)
     }
     performance.mark(step3);
 
