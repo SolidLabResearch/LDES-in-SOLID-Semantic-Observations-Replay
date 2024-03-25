@@ -468,7 +468,6 @@ async function advanceOneObservation() {
 			logger.debug(session);
 			logger.debug(loglevel);
 			const ldes_status = await lil.status();
-
 			if (ldes_status.valid) {
 				await naiveAlgorithm(lilURL, finalResources, treePath, bucketSize, config, prefixes, session, loglevel);
 			}
