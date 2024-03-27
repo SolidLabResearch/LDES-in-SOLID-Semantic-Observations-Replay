@@ -1,13 +1,18 @@
 import {
+    appendRelationToPage,
     DCT,
     extractTimestampFromLiteral,
     ILDESinLDPMetadata,
+    isContainerIdentifier,
+    LDESinLDP,
     LDPCommunication,
+    sleep,
+    TREE,
     turtleStringToStore
 } from "@treecg/versionawareldesinldp";
-import {DataFactory, Literal, Quad, Quad_Object, Store, Writer} from "n3";
-import {existsSync, readFileSync} from "fs";
-import {Session} from "@rubensworks/solid-client-authn-isomorphic";
+import { DataFactory, Literal, Quad, Quad_Object, Store, Writer } from "n3";
+import { existsSync, readFileSync } from "fs";
+import { Session } from "@rubensworks/solid-client-authn-isomorphic";
 
 const namedNode = DataFactory.namedNode;
 
@@ -119,33 +124,33 @@ export function resourceToOptimisedTurtle(resource: Resource, _prefixes: any): s
     const named = new Map<string, Map<string, Quad_Object[]>>();
     const blank = new Map<string, Map<string, Quad_Object[]>>();
     addElements:
-        for (const quad of resource) {
-            const data = quad.subject.termType == "BlankNode" ? blank : named;
-            if (data.has(quad.subject.id)) {
-                const props = data.get(quad.subject.id)!;
-                if (props.has(quad.predicate.id)) {
-                    // check if value is already in array, if it is, dont add it anymore
-                    const objs = props.get(quad.predicate.id)!;
-                    for (const obj of objs) {
-                        // while it might offer better performance to use a set instead
-                        // of an array, the custom type Quad_Object would not work correctly
-                        // with Set.has(), and thus would require a seperate container storing
-                        // the IDs (which would in turn not be memory efficient)
-                        if (obj.equals(quad.object)) {
-                            continue addElements;
-                        }
+    for (const quad of resource) {
+        const data = quad.subject.termType == "BlankNode" ? blank : named;
+        if (data.has(quad.subject.id)) {
+            const props = data.get(quad.subject.id)!;
+            if (props.has(quad.predicate.id)) {
+                // check if value is already in array, if it is, dont add it anymore
+                const objs = props.get(quad.predicate.id)!;
+                for (const obj of objs) {
+                    // while it might offer better performance to use a set instead
+                    // of an array, the custom type Quad_Object would not work correctly
+                    // with Set.has(), and thus would require a seperate container storing
+                    // the IDs (which would in turn not be memory efficient)
+                    if (obj.equals(quad.object)) {
+                        continue addElements;
                     }
-                    objs.push(quad.object);
-                } else {
-                    props.set(quad.predicate.id, new Array(quad.object));
                 }
+                objs.push(quad.object);
             } else {
-                data.set(quad.subject.id, new Map([[quad.predicate.id, new Array(quad.object)]]));
+                props.set(quad.predicate.id, new Array(quad.object));
             }
+        } else {
+            data.set(quad.subject.id, new Map([[quad.predicate.id, new Array(quad.object)]]));
         }
+    }
     // converting all the entries of the blank map first
     // with the ordered view done, a more compact turtle string can be generated
-    const writer = new Writer({prefixes: _prefixes});
+    const writer = new Writer({ prefixes: _prefixes });
     for (const [subject, properties] of named) {
         for (const [predicate, objects] of properties) {
             for (const object of objects) {
@@ -180,12 +185,107 @@ export function resourceToOptimisedTurtle(resource: Resource, _prefixes: any): s
  * @param ldpComm
  * @returns {Promise<void>}
  */
-export async function addResourcesToBuckets(bucketResources: BucketResources, metadata: ILDESinLDPMetadata, ldpComm: LDPCommunication, prefixes: any) {
+export async function addResourcesToBuckets(bucketResources: BucketResources, metadata: ILDESinLDPMetadata, ldpComm: LDPCommunication, prefixes: any, ldes_in_ldp: LDESinLDP) {
     for (const containerURL of Object.keys(bucketResources)) {
         for (const resource of bucketResources[containerURL]) {
-            const response = await ldpComm.post(containerURL, resourceToOptimisedTurtle(resource, prefixes))
-            // console.log(`Resource stored at: ${response.headers.get('location')} | status: ${response.status}`)
-            // TODO: handle when status is not 201 (Http Created)
+            let store = new Store(resource);
+            let eventStream = modifyUrl(containerURL);
+            for (let quad of store) {
+                store.addQuad(namedNode(eventStream), namedNode(TREE.member), namedNode(quad.subject.value));
+            }
+            let ldes_status = await ldes_in_ldp.status();
+            if (ldes_status.valid) {
+                try {
+                    const response = await ldpComm.post(containerURL, resourceToOptimisedTurtle(store.getQuads(null, null, null, null), prefixes)).then(async (response) => {
+                        let date_relation = undefined;
+                        for (let quad of store) {
+                            if (date_relation === undefined) {
+                                if (quad.predicate.value === metadata.view.relations[0].path) {
+                                    date_relation = new Date(quad.object.value)
+                                    await appendRelationToPage({
+                                        communication: ldpComm,
+                                        containerURL: containerURL,
+                                        metadata: metadata,
+                                        date: date_relation,
+                                        resourceURL: response.headers.get('location')!,
+                                    })
+                                }
+                            }
+                        }
+                    });
+                    // console.log(`Resource stored at: ${response.headers.get('location')} | status: ${response.status}`)
+                    // TODO: handle when status is not 201 (Http Created)
+                } catch (error) {
+                    console.error(`Error while adding resource to container ${containerURL}: ${error}`)
+                }
+            }
+            else {
+                sleep(10000);
+                try {
+                    const response = await ldpComm.post(containerURL, resourceToOptimisedTurtle(store.getQuads(null, null, null, null), prefixes)).then(async (response) => {
+                        let date_relation = undefined;
+                        for (let quad of store) {
+                            if (date_relation === undefined) {
+                                if (quad.predicate.value === metadata.view.relations[0].path) {
+                                    date_relation = new Date(quad.object.value)
+                                    await appendRelationToPage({
+                                        communication: ldpComm,
+                                        containerURL: containerURL,
+                                        metadata: metadata,
+                                        date: date_relation,
+                                        resourceURL: response.headers.get('location')!,
+                                    })
+                                }
+                            }
+                        }
+                    });
+                    // console.log(`Resource stored at: ${response.headers.get('location')} | status: ${response.status}`)
+                    // TODO: handle when status is not 201 (Http Created)
+                } catch (error) {
+                    console.error(`Error while adding resource to container ${containerURL}: ${error}`)
+                }
+                // throw new Error("The LDES is not valid, probably because the metadata is still being patched.");
+                // console.log(`The LDES is not valid, probably because the metadata is still being patched.`);
+            }
         }
     }
+}
+
+function modifyUrl(inputUrl: string): string {
+    // Find the last index of "/"
+    let lastIndex = inputUrl.lastIndexOf("/");
+    const secondLastIndex = getSecondLastIndex(inputUrl, "/");
+    lastIndex = secondLastIndex;
+
+    if (lastIndex !== -1) {
+        // Extract the part of the string before the last "/"
+        const strippedPart = inputUrl.substring(0, lastIndex);
+
+        // Append "#EventStream" to the stripped part
+        const modifiedUrl = strippedPart + "/#EventStream";
+
+        return modifiedUrl;
+    } else {
+        // If "/" is not found, return the original URL
+        return inputUrl;
+    }
+}
+
+function getSecondLastIndex(inputString: string, char: string): number {
+    const lastIndex = inputString.lastIndexOf(char);
+    if (lastIndex !== -1) {
+        const secondLastIndex = inputString.lastIndexOf(char, lastIndex - 1);
+        return secondLastIndex;
+    } else {
+        return -1; // Character not found
+    }
+}
+
+
+export async function createContainer(resourceIdentifier: string, communication: LDPCommunication): Promise<void> {
+    if (!isContainerIdentifier(resourceIdentifier)) {
+        throw Error(`Tried creating a container at URL ${resourceIdentifier}, however this is not a Container (due to slash semantics).`)
+    }
+    const response = await communication.put(resourceIdentifier)
+    console.log(`LDP Container created: ${response.url}`)
 }

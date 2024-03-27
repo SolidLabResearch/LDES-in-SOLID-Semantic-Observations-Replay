@@ -57,6 +57,10 @@ export function getTimeStamp(resource: Resource, timestampPath: string): number 
 	console.log(resource);
 	console.log("***");
     const resourceStore = new Store(resource)
+    const timestamp = resourceStore.getObjects(null, namedNode(timestampPath), null)[0] as Literal;
+    console.log(`Extracted Timestamp is:`, timestamp);
+    return extractTimestampFromLiteral(timestamp)// Note: expecting real xsd:dateTime
+    
     return extractTimestampFromLiteral(resourceStore.getObjects(null, timestampPath, null)[0] as Literal)// Note: expecting real xsd:dateTime
 }
 

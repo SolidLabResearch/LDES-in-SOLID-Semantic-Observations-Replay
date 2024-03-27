@@ -93,6 +93,8 @@ const chunkSize = propsJson.chunkSize;
 const bucketSize = propsJson.bucketSize;
 //Targetted Resource Size per bucket.
 const targetResourceSize = propsJson.targetResourceSize;
+//This const defines whether or not the timestamp should be refactored according to the current situation.
+const originalTimestamp = propsJson.original_timestamp;
 
 const event = new Subject();
 
@@ -112,7 +114,7 @@ var sortedObservationSubjects: Array<Resource>;
 var observationPointer: number = 0;
 //Internal variable to keep track of the Authentication session object in case needed.
 var session;
-//This variabele defined whether or not the autoplay function is enabled
+//This variabele defines whether or not the autoplay function is enabled
 var autoplay = false;
 //Time-out until the next observation to be replayed.
 var newDifference;
@@ -369,81 +371,118 @@ async function advanceOneObservation() {
 		logger.info("Retrieving metadata of LDESinLDP if it already exists.");
 		const comm = session ? new SolidCommunication(session) : new LDPCommunication();
 		const lil = new LDESinLDP(lilURL, comm);
-		let metadata: LDESMetadata | undefined
+		let metadata: LDESMetadata;
+		const ldes_status = await lil.status();
+		if (ldes_status.valid) {
+			try {
+				const metadataStore = await lil.readMetadata()
+				const ldes = metadataStore.getSubjects(RDF.type, LDES.EventStream, null)
+				if (ldes.length > 1) {
+					logger.info(`Multiple LDESes detected. ${ldes[0].value} was extracted`)
+				}
+				metadata = extractLdesMetadata(metadataStore, ldes[0].value)
+				console.log(metadata.ldesEventStreamIdentifier);
 
-		try {
-			const metadataStore = await lil.readMetadata()
-			const ldes = metadataStore.getSubjects(RDF.type, LDES.EventStream, null)
-			if (ldes.length > 1) {
-				logger.info(`Multiple LDESes detected. ${ldes[0].value} was extracted`)
+			} catch (e) {
+				logger.info("NO LDES PRESENT");
+				// the LDES in LDP does not exist if this fails -> there is no metadata.
 			}
-			metadata = extractLdesMetadata(metadataStore, ldes[0].value)
-		} catch (e) {
-			logger.info("NO LDES PRESENT");
-			// the LDES in LDP does not exist if this fails -> there is no metadata.
+
+			//Construct the EventStream URI as per agreement, i.e. LIL url concat #EventStream
+			const eventStreamURI = metadata ? metadata.ldesEventStreamIdentifier : lilURL + '#EventStream';
+			logger.debug(eventStreamURI);
+			logger.debug("sortedObservationSubjects.length: " + sortedObservationSubjects.length);
+			if (sortedObservationSubjects.length === 0) {
+				logger.info(`No valid source data found. Exiting...`);
+				return;
+			}
+
+			//Retrieving the set of all information/all triples currently related to the Observation being 	
+			//identified by the Pointer the Observation itself.
+			logger.info("Retrieving all related information to the Observation being replayed.");
+			let finalResources = [];
+			let tempResources = [];
+			for (var pquad of store.match(sortedObservationSubjects[observationPointerTemp], null, null)) {
+				logger.debug(pquad);
+				logger.debug("-->" + pquad.predicate.value);
+				if (pquad.predicate.value == "https://saref.etsi.org/core/hasTimestamp") {
+					logger.debug("Timestamp? TRUE");
+					if (!originalTimestamp) {
+						let d = new Date().toISOString();
+						logger.debug(d);
+						//logger.debug(Date.now().toISOString());
+						logger.debug(pquad.object.termType);
+
+						var myQuad = quad(
+							pquad.subject, // Subject
+							pquad.predicate,    // Predicate
+							literal(d, namedNode("http://www.w3.org/2001/XMLSchema#dateTime")),                              // Object
+							defaultGraph(),                                      // Graph
+						);
+						logger.info(myQuad);
+						tempResources.push(myQuad);
+					}
+				} else {
+					logger.debug("Timestamp? FALSE");
+					tempResources.push(pquad);
+				}
+			}
+			finalResources.push(tempResources);
+			logger.debug(finalResources + "");
+
+			//Now we're optimising the size of the buckets in the POD.
+			logger.info("Calculating the optimal size of the buckets in the pod.");
+			const prefixes = await prefixesFromFilepath(prefixFile, lilURL);
+			const config: LDESConfig = {
+				LDESinLDPIdentifier: lilURL,
+				treePath: treePath,
+				versionOfPath: "1.0"
+			}
+
+			// grouping resources from sortedObservationSubjects together based on size of a single resource and the target resource
+			// size
+			// assume every sourceResource entry is of the same length (on average) to calculate the number of resources
+			// that are to be grouped together
+			logger.debug("targetResourceSize: " + targetResourceSize);
+			const resourceGroupCount = 1 + Math.floor(targetResourceSize / resourceToOptimisedTurtle(finalResources[0], prefixes).length);
+			const resources = batchResources(finalResources, resourceGroupCount);
+
+			let amountResources: number = amount
+			// if input is not a number use the entire collection
+			if (isNaN(amount)) {
+				amountResources = sortedObservationSubjects.length
+			}
+
+			logger.info("The amount of Resources per bucket is: " + amountResources);
+			logger.debug(sortedObservationSubjects + "");
+			logger.debug(sortedObservationSubjects[observationPointerTemp] + "");
+
+			logger.info(`Resources per UUID: ${resourceGroupCount}`)
+			logger.info("Naive algorithm (SINGLE): Execution for " + amountResources + " resources with a bucket size of " + bucketSize);
+
+			logger.debug(lilURL);
+			logger.info("FINAL RESOURCES: " + finalResources);
+			logger.debug(treePath);
+			logger.debug(bucketSize + "");
+			logger.debug(config + "");
+			logger.debug(session);
+			logger.debug(loglevel);
+			const ldes_status = await lil.status();
+			if (ldes_status.valid) {
+				await naiveAlgorithm(lilURL, finalResources, treePath, bucketSize, config, prefixes, session, loglevel);
+			}
+			else {
+				console.log(ldes_status);
+				throw new Error("LDES is not valid. Please check the LDES status before replaying the observations.");
+				
+			}
+
+			event.notify();
 		}
-
-		//Construct the EventStream URI as per agreement, i.e. LIL url concat #EventStream
-		const eventStreamURI = metadata ? metadata.ldesEventStreamIdentifier : lilURL + '#EventStream';
-		logger.debug(eventStreamURI);
-		logger.debug("sortedObservationSubjects.length: " + sortedObservationSubjects.length);
-		if (sortedObservationSubjects.length === 0) {
-			logger.info(`No valid source data found. Exiting...`);
-			return;
+		else {
+			console.log(ldes_status);
+			throw new Error("LDES is not valid. Please check the LDES status before replaying the observations.");
 		}
-
-		//Retrieving the set of all information/all triples currently related to the Observation being 	
-		//identified by the Pointer the Observation itself.
-		logger.info("Retrieving all related information to the Observation being replayed.");
-		let finalResources = [];
-		let tempResources = [];
-		for (const quad of store.match(sortedObservationSubjects[observationPointerTemp], null, null)) {
-			logger.debug(quad);
-			tempResources.push(quad);
-		}
-		finalResources.push(tempResources);
-		logger.debug(finalResources + "");
-
-		//Now we're optimising the size of the buckets in the POD.
-		logger.info("Calculating the optimal size of the buckets in the pod.");
-		const prefixes = await prefixesFromFilepath(prefixFile, lilURL);
-		const config: LDESConfig = {
-			LDESinLDPIdentifier: lilURL,
-			treePath: treePath,
-			versionOfPath: "1.0"
-		}
-
-		// grouping resources from sortedObservationSubjects together based on size of a single resource and the target resource
-		// size
-		// assume every sourceResource entry is of the same length (on average) to calculate the number of resources
-		// that are to be grouped together
-		logger.debug("targetResourceSize: " + targetResourceSize);
-		const resourceGroupCount = 1 + Math.floor(targetResourceSize / resourceToOptimisedTurtle(finalResources[0], prefixes).length);
-		const resources = batchResources(finalResources, resourceGroupCount);
-
-		let amountResources: number = amount
-		// if input is not a number use the entire collection
-		if (isNaN(amount)) {
-			amountResources = sortedObservationSubjects.length
-		}
-
-		logger.info("The amount of Resources per bucket is: " + amountResources);
-		logger.debug(sortedObservationSubjects + "");
-		logger.debug(sortedObservationSubjects[observationPointerTemp] + "");
-
-		logger.info(`Resources per UUID: ${resourceGroupCount}`)
-		logger.info("Naive algorithm (SINGLE): Execution for " + amountResources + " resources with a bucket size of " + bucketSize);
-
-		logger.debug(lilURL);
-		logger.debug(finalResources + "");
-		logger.debug(treePath);
-		logger.debug(bucketSize + "");
-		logger.debug(config + "");
-		logger.debug(session);
-		logger.debug(loglevel);
-		await naiveAlgorithm(lilURL, finalResources, treePath, bucketSize, config, prefixes, session, loglevel);
-
-		event.notify();
 	}
 }
 

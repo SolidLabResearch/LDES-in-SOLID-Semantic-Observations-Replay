@@ -1,8 +1,8 @@
 // TODO: util has to be moved to LdesUtil of the package VersionAwareLIL
-import {Communication, LDES, LDESMetadata, LDP, RDF, storeToString, TREE, XSD} from "@treecg/versionawareldesinldp";
-import {DataFactory, Store} from "n3";
-import {Logger} from "@treecg/versionawareldesinldp/dist/logging/Logger";
-const {quad, namedNode, literal} = DataFactory
+import { Communication, ILDESinLDPMetadata, LDES, LDESMetadata, LDP, patchSparqlUpdateDelete, RDF, storeToString, TREE, XSD } from "@treecg/versionawareldesinldp";
+import { DataFactory, Store } from "n3";
+import { Logger } from "@treecg/versionawareldesinldp/dist/logging/Logger";
+const { quad, namedNode, literal } = DataFactory
 
 /**
  * Convert the ldes metadata object back to an N3 Store
@@ -39,11 +39,30 @@ export function convertLdesMetadata(metadata: LDESMetadata): Store {
 
 export async function editMetadata(resourceIdentifier: string, communication: Communication, body: string): Promise<void> {
     const logger = new Logger(editMetadata.name)
-    const response = await communication.patch(resourceIdentifier + '.meta', body)
+    console.log("Editing metadata of " + resourceIdentifier);
+    const response = await communication.patch(resourceIdentifier + '.meta', body);
+    
+    if (response.status === 409){
+        logger.error("409 Conflict: " + await response.text())
+    }
     if (response.status !== 205) {
         logger.error("Something went wrong when trying to patch the root. This MUST NOT HAPPEN")
         logger.error("Body that should have been inserted: " + body)
         logger.error(await response.text())
-        throw new Error("Something went wrong when trying to patch the root")
     }
+}
+
+export async function removeRelationFromPage(args: {
+    communication: Communication,
+    containerURL: string,
+    metadata: ILDESinLDPMetadata,
+    resourceURL: string,
+}): Promise<void> {
+    const {communication, containerURL, metadata, resourceURL} = args;
+    let store = new Store();
+    store.add(quad(namedNode(containerURL), namedNode(TREE.relation), namedNode(resourceURL)));
+    console.log(store.getQuads(null, null, null, null));
+    await communication.patch(containerURL + '.meta', patchSparqlUpdateDelete(store)).then(() => {
+        console.log("Relation removed from page");
+    });
 }

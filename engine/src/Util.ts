@@ -1,8 +1,8 @@
 // TODO: util has to be moved to LdesUtil of the package VersionAwareLIL
-import {Communication, LDES, LDESMetadata, LDP, RDF, storeToString, TREE, XSD} from "@treecg/versionawareldesinldp";
-import {DataFactory, Store} from "n3";
-import {Logger} from "@treecg/versionawareldesinldp/dist/logging/Logger";
-const {quad, namedNode, literal} = DataFactory
+import { Communication, LDES, LDESMetadata, LDP, RDF, storeToString, TREE, XSD } from "@treecg/versionawareldesinldp";
+import { DataFactory, Store } from "n3";
+import { Logger } from "@treecg/versionawareldesinldp/dist/logging/Logger";
+const { quad, namedNode, literal } = DataFactory
 
 /**
  * Convert the ldes metadata object back to an N3 Store
@@ -40,7 +40,7 @@ export function convertLdesMetadata(metadata: LDESMetadata): Store {
 export async function editMetadata(resourceIdentifier: string, communication: Communication, body: string): Promise<void> {
     const logger = new Logger(editMetadata.name)
     const response = await communication.patch(resourceIdentifier + '.meta', body)
-    if (response.status !== 205) {
+    if (response.status !== 205 && response.status !== 200 && response.status !== 202 && response.status !== 204 && response.status !== 201 && response.status !== 203 && response.status !== 205) {
         logger.error("Something went wrong when trying to patch the root. This MUST NOT HAPPEN")
         logger.error("Body that should have been inserted: " + body)
         logger.error(await response.text())

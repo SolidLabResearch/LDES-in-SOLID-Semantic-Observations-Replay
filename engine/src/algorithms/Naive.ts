@@ -18,20 +18,21 @@ import {
     storeToString
 } from "@treecg/versionawareldesinldp";
 import {Session} from "@rubensworks/solid-client-authn-isomorphic"
-import {addRelationToNode, createContainer} from "@treecg/versionawareldesinldp/dist/ldes/Util";
+import {addRelationToNode} from "@treecg/versionawareldesinldp/dist/ldes/Util";
+import { createContainer } from "./NaiveRebalancing";
 import {DataFactory, Store} from "n3";
 import {rebalanceContainer} from "./NaiveRebalancing";
 import {Logger} from "@treecg/versionawareldesinldp/dist/logging/Logger";
 import {performance, PerformanceObserver} from 'perf_hooks'
 import {editMetadata} from "../util/Util";
-
+import * as propsJson from '../config/replay_properties.json';
 const {quad, namedNode} = DataFactory
 
 
 /** Algorithm A
  *
  *  * step 1: check whether ldes is initialised
- *    * init ldes when not
+ *    * init ldes when nots
  *  * step 2: add all resources to correct bucket
  *  * step 3: rebalance
  *
@@ -72,7 +73,7 @@ export async function naiveAlgorithm(lilURL: string, resources: Resource[], vers
     // step 2: add all resources to correct bucket
     // calculate correct bucket for each resources
     const metadataStore = await lil.readMetadata()
-
+    
     const metadata = MetadataParser.extractLDESinLDPMetadata(metadataStore, lilURL + "#EventStream")
 
 
@@ -111,7 +112,7 @@ export async function naiveAlgorithm(lilURL: string, resources: Resource[], vers
         const newContainerURL = lilURL + earliestResourceTs + "/"
         logger.debug("Creating new container at " + newContainerURL + " for those resources.")
 
-        await createContainer(newContainerURL, comm)
+        await createContainer(newContainerURL, comm, lil)
         const store = new Store()
         addRelationToNode(store, {
             date: new Date(earliestResourceTs),
@@ -126,16 +127,16 @@ export async function naiveAlgorithm(lilURL: string, resources: Resource[], vers
     }
     delete bucketResources["none"]
     // add resource to each bucket
-    await addResourcesToBuckets(bucketResources, metadata, comm, prefixes);
+    await addResourcesToBuckets(bucketResources, metadata, comm, prefixes, lil);
 
     performance.mark(step2);
 
     // step 3: rebalance the buckets
     // go over each bucket over the LDES that has more than 100 resources
     // and create new buckets such that at the end there are less than 100 per bucket.
-    for (const bucketURL of Object.keys(bucketResources)) {
-        await rebalanceContainer(comm, metadata, bucketURL, bucketSize, prefixes)
-    }
+    // for (const bucketURL of Object.keys(bucketResources)) {
+    //     await rebalanceContainer(comm, metadata, bucketURL, bucketSize, prefixes,lil)
+    // }
     performance.mark(step3);
 
     // time measurements
